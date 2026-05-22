@@ -1,10 +1,14 @@
 {
   "name": "quiz3",
   "version": "1.0.0",
-  "description": "",
+  "description": "Orange Quiz - Nền tảng ôn thi hàng đầu Việt Nam",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "setup-db": "node setup_db.js",
+    "seed": "node seed_data.js",
+    "migrate": "node migrate.js"
   },
   "keywords": [],
   "author": "",

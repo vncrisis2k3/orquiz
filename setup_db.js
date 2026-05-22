@@ -20,11 +20,13 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url TEXT,
     is_admin BOOLEAN DEFAULT FALSE,
     survey_data JSONB,
+    roadmap_data TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Đảm bảo cột survey_data tồn tại nếu bảng đã lỡ tạo trước đó
+-- Đảm bảo các cột tồn tại nếu bảng đã lỡ tạo trước đó
 ALTER TABLE users ADD COLUMN IF NOT EXISTS survey_data JSONB;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS roadmap_data TEXT;
 
 -- 3. Quizzes Table
 CREATE TABLE IF NOT EXISTS quizzes (
