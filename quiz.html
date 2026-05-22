@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đang làm bài - Orange Quiz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="quiz.js" defer></script>
+</head>
+<body class="quiz-page">
+    <header class="quiz-header">
+        <div class="container">
+            <div class="quiz-info">
+                <h2 id="quiz-title">Đang tải đề thi...</h2>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </div>
+            <div class="timer" id="timer">15:00</div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="quiz-container" id="quiz-container">
+            <!-- Questions will be injected here -->
+            <div class="loading">Đang tải câu hỏi...</div>
+        </div>
+
+        <div class="quiz-nav">
+            <button class="btn btn-outline" id="prev-btn" disabled>Câu trước</button>
+            <button class="btn btn-primary" id="next-btn">Câu sau</button>
+        </div>
+    </main>
+
+    <!-- Result Modal -->
+    <div class="modal-overlay" id="result-modal">
+        <div class="result-modal">
+            <span class="icon" style="font-size: 64px;">🎉</span>
+            <h2>Chúc mừng bạn đã hoàn thành!</h2>
+            <div class="result-score" id="final-score">0</div>
+            <p class="result-msg" id="result-msg">Bạn đã trả lời đúng 0/0 câu hỏi.</p>
+            <div id="review-container" style="text-align: left; margin: 20px 0; max-height: 300px; overflow-y: auto; display: none;">
+                <h3 style="margin-bottom: 10px;">Nhận xét câu sai:</h3>
+                <div id="wrong-answers-list"></div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button onclick="showReview()" class="btn btn-outline" id="review-btn">Xem câu sai</button>
+                <button onclick="analyzeAI()" class="btn btn-ai" id="ai-btn">
+                    <span class="ai-sparkle">✨</span> Phân tích & Lộ trình
+                </button>
+                <button onclick="loadAnotherQuiz()" class="btn btn-secondary">Làm đề khác</button>
+                <a href="index.html" class="btn btn-primary">Về trang chủ</a>
+            </div>
+
+            <div id="ai-report-container" class="ai-report" style="display: none;">
+                <div class="ai-report-header">
+                    <h3>✨ Phân tích từ AI Antigravity</h3>
+                    <button class="close-report" onclick="document.getElementById('ai-report-container').style.display='none'">×</button>
+                </div>
+                <div id="ai-report-content" class="ai-report-content">
+                    <!-- AI analysis will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
