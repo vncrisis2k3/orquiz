@@ -82,7 +82,7 @@ ON CONFLICT (slug) DO NOTHING;
 
 -- Seed a Sample User (Password: admin123)
 INSERT INTO users (username, email, password_hash, full_name, level, total_points, is_admin)
-VALUES ('admin', 'admin@orangequiz.com', '$2a$10$7R8jZ/G.3x.3fK1G5C5.ueR6N3xY3R3R3R3R3R3R3R3R3R3R3R3R', 'Admin Orange', 10, 5000, TRUE)
+VALUES ('admin', 'admin@eduflow.com', '$2a$10$7R8jZ/G.3x.3fK1G5C5.ueR6N3xY3R3R3R3R3R3R3R3R3R3R3R3R', 'Admin EduFlow', 10, 5000, TRUE)
 ON CONFLICT (username) DO NOTHING;
 
 -- Seed a Sample Quiz (Toán 12)

@@ -1,7 +1,7 @@
 {
   "name": "quiz3",
   "version": "1.0.0",
-  "description": "Orange Quiz - Nền tảng ôn thi hàng đầu Việt Nam",
+  "description": "Edu-Flow - Nền tảng ôn thi hàng đầu Việt Nam",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,11 +14,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google/genai": "^2.2.0",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
-    "docx-pdf-converter": "^1.2.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",

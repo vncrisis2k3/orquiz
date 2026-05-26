@@ -15,7 +15,7 @@ const db = require('../db');
 require('dotenv').config();
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || 'orange_quiz_secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'eduflow_secret';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 app.use(cors());
@@ -61,7 +61,7 @@ app.post('/api/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Check if registering as admin
-        const isAdmin = admin_code && admin_code === (process.env.ADMIN_SECRET || 'ORANGE_ADMIN_2026');
+        const isAdmin = admin_code && admin_code === (process.env.ADMIN_SECRET || 'EDUFLOW_ADMIN_2026');
 
         const newUser = await db.query(
             'INSERT INTO users (username, email, password_hash, full_name, is_admin, survey_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, email, is_admin',
