@@ -62,7 +62,7 @@ node setup_db.js
 # Khởi chạy server
 node server.js
 ```
-Mở trình duyệt và truy cập: `http://localhost:5000`
+Mở trình duyệt và truy cập: `c`
 
 ## 📂 Cấu trúc dự án
 
@@ -83,4 +83,4 @@ Mở trình duyệt và truy cập: `http://localhost:5000`
 > [!TIP]
 > Để trải nghiệm tính năng AI tốt nhất, hãy đảm bảo bạn đã cung cấp đầy đủ thông tin khảo sát trong trang cá nhân trước khi tạo Lộ trình học tập.
 
-*Phát triển với ❤️ bởi đội ngũ Orange Quiz. Chúc bạn có những trải nghiệm học tập tuyệt vời!* 🚀
+
