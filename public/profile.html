@@ -29,6 +29,7 @@
             top: -200px;
             right: -100px;
             border-radius: 50%;
+            pointer-events: none;
         }
         .profile-hero::after {
             content: '';
@@ -39,6 +40,27 @@
             bottom: -150px;
             left: -100px;
             border-radius: 50%;
+            pointer-events: none;
+        }
+        .profile-hero > .container {
+            position: relative;
+            z-index: 1;
+        }
+        .profile-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        @media (max-width: 768px) {
+            .profile-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .profile-actions .btn {
+                width: 100%;
+                min-height: 48px;
+            }
         }
         .profile-avatar {
             width: 140px;
@@ -363,11 +385,11 @@
             <div class="profile-avatar" id="prof-avatar">?</div>
             <h1 id="prof-name" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 10px;">Đang tải...</h1>
             <p id="prof-email" style="font-size: 1.1rem; opacity: 0.9; font-weight: 500;">...</p>
-            <div style="display: flex; justify-content: center; gap: 15px; margin-top: 30px;">
-                <button class="btn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 12px 25px; border-radius: 18px; font-weight: 600;" onclick="openEditModal()">
+            <div class="profile-actions">
+                <button type="button" class="btn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 12px 25px; border-radius: 18px; font-weight: 600;" onclick="openEditModal()">
                     ✨ Chỉnh sửa hồ sơ
                 </button>
-                <button class="btn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 12px 25px; border-radius: 18px; font-weight: 600;" onclick="openPasswordModal()">
+                <button type="button" class="btn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 12px 25px; border-radius: 18px; font-weight: 600;" onclick="openPasswordModal()">
                     🔒 Đổi mật khẩu
                 </button>
             </div>
