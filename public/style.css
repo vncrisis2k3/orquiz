@@ -25,6 +25,22 @@
     --radius-sm: 15px;
 }
 
+:root[data-theme="dark"] {
+    --secondary: #E2E8F0;
+    --bg-light: #0F172A;
+    --bg-orange: #2A1D10;
+    --white: #172033;
+    --text-dark: #F8FAFC;
+    --text-gray: #A8B3C5;
+    --glass: rgba(15, 23, 42, 0.94);
+    --glass-border: rgba(255, 172, 82, 0.2);
+    --primary-soft: rgba(255, 138, 0, 0.16);
+    --primary-ultra-soft: rgba(255, 138, 0, 0.09);
+    --shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.45);
+    --shadow-hover: 0 40px 80px -15px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 12px 24px -6px rgba(0, 0, 0, 0.35);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -37,6 +53,164 @@ body {
     color: var(--text-dark);
     line-height: 1.6;
     overflow-x: hidden;
+}
+
+.theme-toggle {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    z-index: 10001;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background: var(--glass);
+    color: var(--text-dark);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px) scale(1.05);
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .quiz-page {
+    background: var(--bg-light) !important;
+    color: var(--text-dark);
+}
+
+[data-theme="dark"] .navbar {
+    background: var(--glass) !important;
+    border-bottom-color: var(--glass-border) !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: #111C2F !important;
+    color: var(--text-dark) !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: #94A3B8;
+}
+
+[data-theme="dark"] .subject-card,
+[data-theme="dark"] .quiz-card,
+[data-theme="dark"] .question-card,
+[data-theme="dark"] .result-modal,
+[data-theme="dark"] .roadmap-card,
+[data-theme="dark"] .side-info-card,
+[data-theme="dark"] .profile-card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .streak-section,
+[data-theme="dark"] .ranking-card,
+[data-theme="dark"] .survey-card,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .auth-container,
+[data-theme="dark"] .google-modal,
+[data-theme="dark"] .leaderboard-card,
+[data-theme="dark"] .podium-card,
+[data-theme="dark"] .podium-place,
+[data-theme="dark"] .practice-info-card,
+[data-theme="dark"] .loading-overlay,
+[data-theme="dark"] .chat-sidebar,
+[data-theme="dark"] .chat-input-area,
+[data-theme="dark"] .message-wrapper.bot .message-bubble,
+[data-theme="dark"] #chat-panel,
+[data-theme="dark"] #chat-panel-messages {
+    background: #172033 !important;
+    color: var(--text-dark) !important;
+    border-color: #2D3B52 !important;
+}
+
+[data-theme="dark"] .chat-layout,
+[data-theme="dark"] .profile-content,
+[data-theme="dark"] .leaderboard-section,
+[data-theme="dark"] .practice-content {
+    background: var(--bg-light) !important;
+}
+
+[data-theme="dark"] .info-tag,
+[data-theme="dark"] .roadmap-history-btn,
+[data-theme="dark"] .suggestion-btn,
+[data-theme="dark"] .option-btn {
+    background: #111C2F !important;
+    color: var(--text-dark) !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .roadmap-history-btn.active,
+[data-theme="dark"] .option-btn.selected {
+    background: rgba(255, 138, 0, 0.16) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary-light) !important;
+}
+
+[data-theme="dark"] .podium-place.first,
+[data-theme="dark"] .podium-place.second,
+[data-theme="dark"] .podium-place.third {
+    background: #172033 !important;
+}
+
+[data-theme="dark"] .roadmap-content,
+[data-theme="dark"] .google-modal-header h3,
+[data-theme="dark"] .google-modal label {
+    color: var(--text-dark) !important;
+}
+
+[data-theme="dark"] .ranking-table th {
+    background: #111C2F !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] .message-wrapper.bot .message-bubble,
+[data-theme="dark"] .message-wrapper.bot .message-bubble *,
+[data-theme="dark"] .chat-panel-bot-message,
+[data-theme="dark"] .chat-panel-bot-message * {
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .chat-panel-bot-message {
+    background: #172033 !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] table,
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+    color: var(--text-dark);
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background: #F8FAFC"],
+[data-theme="dark"] [style*="background: #F1F5F9"],
+[data-theme="dark"] [style*="background: #FFFBF8"] {
+    background: #172033 !important;
+}
+
+[data-theme="dark"] [style*="color: #334155"],
+[data-theme="dark"] [style*="color: #1E293B"],
+[data-theme="dark"] [style*="color: #0F172A"] {
+    color: var(--text-dark) !important;
+}
+
+@media (max-width: 600px) {
+    .theme-toggle {
+        left: 14px;
+        bottom: 14px;
+        width: 44px;
+        height: 44px;
+    }
 }
 
 ::selection {
@@ -1214,11 +1388,13 @@ body {
     }
 
     #chat-panel {
-        width: calc(100vw - 28px) !important;
-        height: min(520px, calc(100vh - 110px)) !important;
-        right: 0 !important;
-        bottom: 70px !important;
-        border-radius: 20px !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        border: 0 !important;
+        border-radius: 0 !important;
     }
 }
 

@@ -305,13 +305,34 @@ function getSubjectIcon(slug) {
 }
 
 let chatHistory = [];
-let currentSubjectName = '';
 
-function initFloatingChatbot(subjects) {
+function initFloatingChatbot() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
     if (document.getElementById('floating-chat-container')) return;
+
+    let userId = 'default';
+    try {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (user && user.id) userId = user.id;
+    } catch (err) {
+        console.error('Could not read chatbot user:', err);
+    }
+    const chatStorageKey = `chatHistory_${userId}`;
+
+    try {
+        const savedHistory = JSON.parse(localStorage.getItem(chatStorageKey) || '[]');
+        chatHistory = Array.isArray(savedHistory) ? savedHistory.slice(-20) : [];
+    } catch (err) {
+        chatHistory = [];
+        console.error('Could not restore chatbot history:', err);
+    }
+
+    const saveChatHistory = () => {
+        chatHistory = chatHistory.slice(-20);
+        localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+    };
 
     // Create container
     const container = document.createElement('div');
@@ -373,22 +394,11 @@ function initFloatingChatbot(subjects) {
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 1.2rem;">🤖</span>
                 <div>
-                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Gia sư AI Hỏi Đáp</h4>
+                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">StudyFlow</h4>
                     <span style="font-size: 0.72rem; color: #10B981; font-weight: 600;">● Đang hoạt động</span>
                 </div>
             </div>
             <span id="close-chat-btn" style="cursor: pointer; font-size: 1.2rem; font-weight: 700; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8">×</span>
-        </div>
-    `;
-
-    // Dropdown Selection HTML
-    const optionsHTML = subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    const selectorHTML = `
-        <div style="padding: 10px 15px; background: #FFF3E0; border-bottom: 1px solid rgba(255, 122, 0, 0.1); display: flex; align-items: center; gap: 10px;">
-            <label style="font-size: 0.8rem; font-weight: 700; color: #E67E00; white-space: nowrap;">Môn học:</label>
-            <select id="chat-subject-select" style="flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255, 122, 0, 0.25); font-family: inherit; font-size: 0.85rem; font-weight: 600; outline: none; cursor: pointer; color: #1E293B;">
-                ${optionsHTML}
-            </select>
         </div>
     `;
 
@@ -414,7 +424,7 @@ function initFloatingChatbot(subjects) {
 
     const inputField = document.createElement('input');
     inputField.type = 'text';
-    inputField.placeholder = 'Hỏi gia sư AI về môn học...';
+    inputField.placeholder = 'Nhập câu hỏi của bạn...';
     inputField.style.flex = '1';
     inputField.style.padding = '10px 16px';
     inputField.style.borderRadius = '12px';
@@ -439,7 +449,7 @@ function initFloatingChatbot(subjects) {
     sendBtn.style.boxShadow = '0 4px 12px rgba(255,100,0,0.2)';
     
     // Assemble panel elements
-    panel.innerHTML = headerHTML + selectorHTML;
+    panel.innerHTML = headerHTML;
     panel.appendChild(messagesBox);
     inputBar.appendChild(inputField);
     inputBar.appendChild(sendBtn);
@@ -550,20 +560,16 @@ function initFloatingChatbot(subjects) {
         bubble.innerHTML = '💬';
     };
 
-    // Subject Dropdown Action
-    const selectEl = panel.querySelector('#chat-subject-select');
-    const updateWelcomeMessage = () => {
-        const selectedName = selectEl.options[selectEl.selectedIndex].text;
-        currentSubjectName = selectedName;
-        chatHistory = [];
-        messagesBox.innerHTML = '';
-        appendPanelBotMessage(`Chào bạn! Mình là Gia sư AI môn **${selectedName}**. Hãy đặt câu hỏi hoặc gửi bài tập để mình giải đáp nhé!`);
-    };
-
-    selectEl.onchange = updateWelcomeMessage;
-    // Initial welcome
-    if (selectEl.options.length > 0) {
-        updateWelcomeMessage();
+    if (chatHistory.length > 0) {
+        chatHistory.forEach(msg => {
+            if (msg.isUser) {
+                appendPanelUserMessage(msg.text);
+            } else {
+                appendPanelBotMessage(msg.text);
+            }
+        });
+    } else {
+        appendPanelBotMessage('Chào bạn! Mình là StudyFlow. Bạn có thể hỏi mình về bất kỳ môn học nào.');
     }
 
     // Send logic
@@ -593,7 +599,6 @@ function initFloatingChatbot(subjects) {
                     'x-auth-token': token
                 },
                 body: JSON.stringify({
-                    subject_name: currentSubjectName,
                     message: msgText,
                     history: formattedHistory
                 })
@@ -607,6 +612,7 @@ function initFloatingChatbot(subjects) {
                 appendPanelBotMessage(data.reply);
                 chatHistory.push({ isUser: true, text: msgText });
                 chatHistory.push({ isUser: false, text: data.reply });
+                saveChatHistory();
             } else {
                 appendPanelBotMessage('❌ Không thể nhận phản hồi từ AI lúc này.');
             }
@@ -654,6 +660,7 @@ function initFloatingChatbot(subjects) {
 
     function appendPanelBotMessage(markdownText) {
         const wrap = document.createElement('div');
+        wrap.className = 'chat-panel-bot-message';
         wrap.style.alignSelf = 'flex-start';
         wrap.style.maxWidth = '85%';
         wrap.style.background = 'white';
@@ -687,6 +694,7 @@ function initFloatingChatbot(subjects) {
         const id = 'typing-' + Date.now();
         const wrap = document.createElement('div');
         wrap.id = id;
+        wrap.className = 'chat-panel-bot-message';
         wrap.style.alignSelf = 'flex-start';
         wrap.style.background = 'white';
         wrap.style.padding = '10px 14px';

@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
@@ -316,15 +317,8 @@
 
     <div class="chat-layout">
         <aside class="chat-sidebar">
-            <div class="subject-selector-card">
-                <h4>📚 Chọn môn học hỏi đáp</h4>
-                <select id="subject-select" class="subject-dropdown" onchange="onSubjectChange()">
-                </select>
-            </div>
-
             <div>
-                <h4 style="color: var(--secondary); font-size: 0.9rem; margin-bottom: 12px; font-weight: 700;">💡 Gợi ý
-                    câu hỏi</h4>
+                <h4 style="color: var(--secondary); font-size: 0.9rem; margin-bottom: 12px; font-weight: 700;">💡 Gợi ý câu hỏi</h4>
                 <div class="suggestions-container" id="suggestions-box">
                 </div>
             </div>
@@ -346,47 +340,15 @@
         const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
 
         let chatHistory = [];
-        let chatHistories = {}; // Lưu lịch sử chat theo từng môn học
-        let chatStorageKey = 'chatHistories_default';
-        let currentSubjectName = '';
-        let currentSubjectId = null;
-        let subjectsList = [];
-
-        const defaultSuggestions = {
-            'Toán Học': [
-                'Giải thích công thức tính đạo hàm của hàm hợp.',
-                'Làm sao để tìm cực trị của hàm số bậc ba?',
-                'Cho em một ví dụ về tích phân từng phần.'
-            ],
-            'Vật Lý': [
-                'Hãy tóm tắt các công thức chương Dao động cơ.',
-                'Định luật khúc xạ ánh sáng phát biểu thế nào?',
-                'Thế nào là hiện tượng quang điện ngoài?'
-            ],
-            'Hóa Học': [
-                'Làm sao để nhận biết các ion trong dung dịch?',
-                'Viết sơ đồ phản ứng chuỗi este hóa.',
-                'Giải thích thuyết lai hóa obitan nguyên tử.'
-            ],
-            'Sinh Học': [
-                'Quy luật phân ly độc lập của Menđen phát biểu thế nào?',
-                'Sự khác nhau giữa ADN và ARN là gì?',
-                'Cơ chế nhân đôi ADN diễn ra như thế nào?'
-            ],
-            'Tiếng Anh': [
-                'Giải thích cấu trúc câu điều kiện loại 3.',
-                'Sự khác nhau giữa Present Perfect và Past Simple là gì?',
-                'Cho em một số mẹo làm bài đọc hiểu Tiếng Anh.'
-            ]
-        };
+        let chatStorageKey = 'chatHistory_default';
 
         const genericSuggestions = [
-            'Giải thích khái niệm cơ bản môn này.',
-            'Cho em một bài tập mẫu kèm lời giải.',
-            'Cách ôn thi môn này hiệu quả cao.'
+            'Giải thích một khái niệm mà mình chưa hiểu.',
+            'Cho mình một bài tập mẫu kèm lời giải.',
+            'Gợi ý cách ôn tập hiệu quả cho kỳ thi.'
         ];
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('token');
             if (!token) {
                 window.location.href = 'auth.html';
@@ -402,90 +364,41 @@
                     if (user && user.id) userId = user.id;
                 } catch (e) {}
             }
-            chatStorageKey = `chatHistories_${userId}`;
+            chatStorageKey = `chatHistory_${userId}`;
             try {
-                chatHistories = JSON.parse(localStorage.getItem(chatStorageKey) || '{}');
+                const savedHistory = JSON.parse(localStorage.getItem(chatStorageKey) || '[]');
+                chatHistory = Array.isArray(savedHistory) ? savedHistory.slice(-20) : [];
             } catch (e) {
-                console.error('Lỗi load chatHistories:', e);
+                chatHistory = [];
+                console.error('Lỗi tải lịch sử chatbot:', e);
             }
 
-            await loadSubjects();
-
-            // Read URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const subId = urlParams.get('subject');
-            const subName = urlParams.get('name');
-
-            if (subId && subName) {
-                currentSubjectId = String(subId);
-                currentSubjectName = decodeURIComponent(subName);
-                document.getElementById('subject-select').value = subId;
-            } else if (subjectsList.length > 0) {
-                currentSubjectId = String(subjectsList[0].id);
-                currentSubjectName = subjectsList[0].name;
-            }
-
-            onSubjectChange(); // Initialize chat interface
+            initializeChat();
         });
 
-        async function loadSubjects() {
-            try {
-                const res = await fetch(`${API_URL}/subjects`);
-                if (res.ok) {
-                    subjectsList = await res.json();
-                    const select = document.getElementById('subject-select');
-                    select.innerHTML = subjectsList.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
         function saveCurrentChat() {
-            if (currentSubjectId) {
-                chatHistories[currentSubjectId] = {
-                    history: chatHistory,
-                    html: document.getElementById('chat-messages-container').innerHTML
-                };
-                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistories));
-            }
+            chatHistory = chatHistory.slice(-20);
+            localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
         }
 
-        function onSubjectChange() {
-            const select = document.getElementById('subject-select');
-            const newSubjectId = String(select.value);
-
-            // Lưu lịch sử chat của môn học cũ trước khi chuyển môn
-            if (currentSubjectId && String(currentSubjectId) !== newSubjectId) {
-                chatHistories[currentSubjectId] = {
-                    history: chatHistory,
-                    html: document.getElementById('chat-messages-container').innerHTML
-                };
-                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistories));
-            }
-
-            currentSubjectId = newSubjectId;
-            currentSubjectName = select.options[select.selectedIndex].text;
-
+        function initializeChat() {
             const container = document.getElementById('chat-messages-container');
+            container.innerHTML = '';
 
-            // Khôi phục lịch sử nếu đã có, hoặc tạo mới nếu chưa có
-            if (chatHistories[currentSubjectId]) {
-                chatHistory = chatHistories[currentSubjectId].history;
-                container.innerHTML = chatHistories[currentSubjectId].html;
+            if (chatHistory.length > 0) {
+                chatHistory.forEach(msg => {
+                    if (msg.isUser) {
+                        appendUserMessage(msg.text);
+                    } else {
+                        appendBotMessage(msg.text);
+                    }
+                });
             } else {
-                chatHistory = [];
-                container.innerHTML = '';
-                // Render tin nhắn chào mừng
-                appendBotMessage(`Xin chào! Mình là Gia sư AI môn **${currentSubjectName}**. Bạn có câu hỏi nào cần giải đáp hoặc bài tập nào cần hướng dẫn hôm nay không?`);
-                saveCurrentChat();
+                appendBotMessage('Xin chào! Mình là StudyFlow. Bạn có thể hỏi mình về bất kỳ môn học nào.');
             }
 
-            // Cập nhật gợi ý câu hỏi
             const suggestionsBox = document.getElementById('suggestions-box');
-            let suggestions = defaultSuggestions[currentSubjectName] || defaultSuggestions[currentSubjectName.replace(' Học', '')] || genericSuggestions;
-
-            suggestionsBox.innerHTML = suggestions.map(s => `
+            suggestionsBox.innerHTML = genericSuggestions.map(s => `
                 <button class="suggestion-btn" onclick="useSuggestion('${s}')">${s}</button>
             `).join('');
 
@@ -531,7 +444,6 @@
                         'x-auth-token': token
                     },
                     body: JSON.stringify({
-                        subject_name: currentSubjectName,
                         message: text,
                         history: formattedHistory
                     })

@@ -96,24 +96,22 @@ async function loadQuiz(id) {
         
         document.getElementById('quiz-title').textContent = currentQuiz.title;
         
+        const timerEl = document.getElementById('timer');
         if (currentMode === 'practice') {
             timeLeft = 0;
-            const timerEl = document.getElementById('timer');
             if (timerEl) {
-                timerEl.textContent = "Luyện tập: 0:00";
-                timerEl.style.background = "rgba(16, 185, 129, 0.1)";
-                timerEl.style.color = "#10B981";
+                timerEl.style.display = 'none';
             }
         } else {
             timeLeft = currentQuiz.duration_minutes * 60;
-            const timerEl = document.getElementById('timer');
             if (timerEl) {
+                timerEl.style.display = '';
                 timerEl.style.background = "rgba(255, 122, 0, 0.1)";
                 timerEl.style.color = "var(--primary)";
             }
+            startTimer();
         }
         
-        startTimer();
         renderQuestion();
     } catch (error) {
         console.error('Error loading quiz:', error);
@@ -185,32 +183,20 @@ function prevQuestion() {
 }
 
 function startTimer() {
-    if (currentMode === 'practice') {
-        timerInterval = setInterval(() => {
-            timeLeft++;
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            const timerEl = document.getElementById('timer');
-            if (timerEl) {
-                timerEl.textContent = `Luyện tập: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            }
-        }, 1000);
-    } else {
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            const timerEl = document.getElementById('timer');
-            if (timerEl) {
-                timerEl.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            }
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        const timerEl = document.getElementById('timer');
+        if (timerEl) {
+            timerEl.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
 
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                submitQuiz();
-            }
-        }, 1000);
-    }
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            submitQuiz();
+        }
+    }, 1000);
 }
 
 async function submitQuiz() {
@@ -248,7 +234,7 @@ async function submitQuiz() {
                 score: score,
                 correct_count: correctCount,
                 total_count: questions.length,
-                time_spent: currentMode === 'practice' ? timeLeft : (currentQuiz.duration_minutes * 60) - timeLeft
+                time_spent: currentMode === 'practice' ? 0 : (currentQuiz.duration_minutes * 60) - timeLeft
             })
         });
         const data = await res.json();

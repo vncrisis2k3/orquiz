@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
     <!-- Chart.js and KaTeX for Statistics and Question Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -289,6 +290,93 @@
                 font-size: 20px;
             }
         }
+
+        [data-theme="dark"] {
+            --admin-bg: #0b1120;
+        }
+
+        [data-theme="dark"] body,
+        [data-theme="dark"] #admin-login-overlay,
+        [data-theme="dark"] .main-content {
+            background: var(--admin-bg) !important;
+            color: #f8fafc;
+        }
+
+        [data-theme="dark"] .tool-card,
+        [data-theme="dark"] .stat-box,
+        [data-theme="dark"] .admin-login-card,
+        [data-theme="dark"] #quiz-preview-modal > div,
+        [data-theme="dark"] #manual-questions-list > div,
+        [data-theme="dark"] #preview-modal-questions > div,
+        [data-theme="dark"] #ai-gen-loader {
+            background: #172033 !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .sidebar {
+            background: linear-gradient(180deg, #111827 0%, #070b14 100%);
+            border-right: 1px solid #263349;
+        }
+
+        [data-theme="dark"] .ranking-table th,
+        [data-theme="dark"] .ranking-table td {
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+
+        [data-theme="dark"] input,
+        [data-theme="dark"] select,
+        [data-theme="dark"] textarea {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+
+        [data-theme="dark"] label,
+        [data-theme="dark"] h1,
+        [data-theme="dark"] h2,
+        [data-theme="dark"] h3,
+        [data-theme="dark"] h4,
+        [data-theme="dark"] p,
+        [data-theme="dark"] code {
+            color: inherit;
+        }
+
+        [data-theme="dark"] [style*="background: #f8fafc"],
+        [data-theme="dark"] [style*="background: #f1f5f9"],
+        [data-theme="dark"] [style*="background: #fff7ed"],
+        [data-theme="dark"] [style*="background: #fdf2f2"],
+        [data-theme="dark"] [style*="background: #f0fdf4"] {
+            background: #111c2f !important;
+            border-color: #334155 !important;
+        }
+
+        [data-theme="dark"] [style*="background: white"] {
+            background: #172033 !important;
+            border-color: #334155 !important;
+        }
+
+        [data-theme="dark"] [style*="color: #334155"],
+        [data-theme="dark"] [style*="color: #475569"],
+        [data-theme="dark"] [style*="color: #1e293b"],
+        [data-theme="dark"] [style*="color: #991b1b"],
+        [data-theme="dark"] [style*="color: #166534"] {
+            color: #e2e8f0 !important;
+        }
+
+        .theme-toggle {
+            left: auto;
+            right: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .theme-toggle {
+                left: auto;
+                right: 14px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -355,6 +443,7 @@
                 <li onclick="showSection('scan', this)">📄 Quét file PDF</li>
                 <li onclick="showSection('ai-gen', this)">✨ Tạo đề bằng AI</li>
                 <li onclick="showSection('manual', this)">✍️ Tạo đề thủ công</li>
+                <li onclick="showSection('settings', this)">⚙️ Cấu hình Gemini</li>
                 <li onclick="logoutAdmin()" style="margin-top: 50px; color: #f87171;">🚪 Đăng xuất</li>
             </ul>
         </aside>
@@ -569,6 +658,43 @@
                     </div>
                 </div>
             </section>
+
+            <section id="section-settings" class="admin-section">
+                <div class="tool-card" style="max-width: 760px;">
+                    <h2 style="color: var(--primary);">⚙️ Cấu hình Gemini API</h2>
+                    <p style="color: var(--text-gray); margin: 10px 0 25px;">
+                        API key được lưu trên máy chủ và không hiển thị đầy đủ lại trên trình duyệt.
+                        Key mới có hiệu lực ngay cho chatbot, roadmap, phân tích và tạo đề AI.
+                    </p>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; margin-bottom: 22px;">
+                        <div style="display: flex; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                            <span style="font-weight: 700;">Trạng thái</span>
+                            <span id="gemini-key-status" style="color: var(--text-gray);">Đang tải...</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                            <span style="font-weight: 700;">Key hiện tại</span>
+                            <code id="gemini-masked-key">--</code>
+                        </div>
+                    </div>
+
+                    <form id="gemini-settings-form">
+                        <div class="form-group">
+                            <label for="gemini-api-key">Gemini API key mới</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="password" id="gemini-api-key" autocomplete="new-password"
+                                    placeholder="Nhập API key Gemini"
+                                    style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
+                                <button type="button" class="btn btn-outline" onclick="toggleGeminiKeyVisibility()">Hiện</button>
+                            </div>
+                        </div>
+                        <button type="submit" id="save-gemini-key-btn" class="btn btn-primary" style="margin-top: 20px;">
+                            Lưu API key
+                        </button>
+                        <p id="gemini-settings-message" style="display: none; margin-top: 15px;"></p>
+                    </form>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -598,6 +724,29 @@
 
     <script>
         const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+
+        function configureAdminCharts() {
+            if (typeof Chart === 'undefined') return;
+            const isDark = document.documentElement.dataset.theme === 'dark';
+            Chart.defaults.color = isDark ? '#CBD5E1' : '#64748B';
+            Chart.defaults.borderColor = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(0, 0, 0, 0.08)';
+        }
+
+        function getAdminChartGridColor() {
+            return document.documentElement.dataset.theme === 'dark'
+                ? 'rgba(148, 163, 184, 0.18)'
+                : 'rgba(0, 0, 0, 0.05)';
+        }
+
+        configureAdminCharts();
+        window.addEventListener('themechange', () => {
+            configureAdminCharts();
+            const dashboard = document.getElementById('admin-dashboard');
+            if (dashboard?.style.display === 'flex' &&
+                document.getElementById('section-dashboard')?.classList.contains('active')) {
+                loadDashboardStats();
+            }
+        });
         
         async function checkAdmin() {
             const token = localStorage.getItem('token');
@@ -644,6 +793,7 @@
             await loadUsers();
             await loadQuizzes();
             await loadSubjects();
+            await loadGeminiSettings();
         }
 
         async function loadUsers() {
@@ -713,8 +863,83 @@
             
             if (name === 'dashboard') {
                 loadDashboardStats();
+            } else if (name === 'settings') {
+                loadGeminiSettings();
             }
         }
+
+        async function loadGeminiSettings() {
+            const token = localStorage.getItem('token');
+            const statusEl = document.getElementById('gemini-key-status');
+            const maskedKeyEl = document.getElementById('gemini-masked-key');
+            if (!statusEl || !maskedKeyEl) return;
+
+            try {
+                const res = await fetch(`${API_URL}/admin/settings/gemini`, {
+                    headers: { 'x-auth-token': token },
+                    cache: 'no-store'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || 'Không thể tải cấu hình.');
+
+                statusEl.textContent = data.configured
+                    ? `Đã cấu hình (${data.source === 'database' ? 'Admin' : 'Biến môi trường'})`
+                    : 'Chưa cấu hình';
+                statusEl.style.color = data.configured ? '#10B981' : '#EF4444';
+                maskedKeyEl.textContent = data.masked_key || '--';
+            } catch (err) {
+                statusEl.textContent = err.message;
+                statusEl.style.color = '#EF4444';
+            }
+        }
+
+        function toggleGeminiKeyVisibility() {
+            const input = document.getElementById('gemini-api-key');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        document.getElementById('gemini-settings-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const input = document.getElementById('gemini-api-key');
+            const button = document.getElementById('save-gemini-key-btn');
+            const message = document.getElementById('gemini-settings-message');
+            const apiKey = input.value.trim();
+
+            if (!apiKey) {
+                message.textContent = 'Vui lòng nhập API key mới.';
+                message.style.color = '#EF4444';
+                message.style.display = 'block';
+                return;
+            }
+
+            button.disabled = true;
+            message.style.display = 'none';
+            try {
+                const res = await fetch(`${API_URL}/admin/settings/gemini`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || 'Không thể lưu API key.');
+
+                input.value = '';
+                input.type = 'password';
+                message.textContent = data.msg;
+                message.style.color = '#10B981';
+                message.style.display = 'block';
+                await loadGeminiSettings();
+            } catch (err) {
+                message.textContent = err.message;
+                message.style.color = '#EF4444';
+                message.style.display = 'block';
+            } finally {
+                button.disabled = false;
+            }
+        });
 
         function toggleAdminAuth(type) {
             const loginForm = document.getElementById('admin-login-form');
@@ -1082,7 +1307,7 @@
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            y: { beginAtZero: true, grid: { color: getAdminChartGridColor() } },
                             x: { grid: { display: false } }
                         }
                     }
@@ -1114,7 +1339,7 @@
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            y: { min: 0, max: 10, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            y: { min: 0, max: 10, grid: { color: getAdminChartGridColor() } },
                             x: { grid: { display: false } }
                         }
                     }
@@ -1176,7 +1401,7 @@
                             legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Outfit' } } }
                         },
                         scales: {
-                            r: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { display: false } }
+                            r: { grid: { color: getAdminChartGridColor() }, ticks: { display: false } }
                         }
                     }
                 });

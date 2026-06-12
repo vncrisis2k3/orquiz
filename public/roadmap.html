@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
     <!-- KaTeX CDN for mathematical/scientific rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -87,6 +88,29 @@
             margin: 0 5px 10px 0;
             border: 1px solid #E2E8F0;
         }
+        .roadmap-history {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .roadmap-history-btn {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            background: white;
+            color: #475569;
+            text-align: left;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .roadmap-history-btn.active {
+            border-color: var(--primary);
+            background: var(--bg-orange);
+            color: var(--primary);
+            font-weight: 700;
+        }
     </style>
 </head>
 <body style="background: #F1F5F9;">
@@ -123,6 +147,8 @@
                         <!-- User info tags -->
                     </div>
                     <hr style="margin: 20px 0; border: none; border-top: 1px dashed #cbd5e1;">
+                    <h4 id="roadmap-history-title" style="margin-bottom: 12px;">Lịch sử lộ trình</h4>
+                    <div id="roadmap-history" class="roadmap-history"></div>
                     <button class="btn btn-primary" style="width: 100%;" onclick="generateRoadmap()">Cập nhật lộ trình mới</button>
                 </div>
             </aside>
@@ -144,6 +170,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+        let roadmapHistory = [];
         
         async function init() {
             const token = localStorage.getItem('token');
@@ -191,24 +218,83 @@
                     <div class="info-tag">Mục tiêu: ${s.goal || '--'}</div>
                 `;
 
-                if (user.roadmap_data) {
+                roadmapHistory = await loadRoadmapHistory(token);
+                if (roadmapHistory.length > 0) {
                     document.getElementById('roadmap-empty').style.display = 'none';
                     document.getElementById('roadmap-view').style.display = 'grid';
-                    const targetEl = document.getElementById('roadmap-html-content');
-                    targetEl.innerHTML = marked.parse(user.roadmap_data);
-                    if (typeof renderMathInElement === 'function') {
-                        renderMathInElement(targetEl, {
-                            delimiters: [
-                                {left: "$$", right: "$$", display: true},
-                                {left: "$", right: "$", display: false},
-                                {left: "\\(", right: "\\)", display: false},
-                                {left: "\\[", right: "\\]", display: true}
-                            ],
-                            throwOnError: false
-                        });
-                    }
+                    renderRoadmapHistory();
+                    showRoadmap(0);
                 }
             } catch (err) { console.error(err); }
+        }
+
+        async function loadRoadmapHistory(token) {
+            const res = await fetch(`${API_URL}/roadmap/history`, {
+                headers: { 'x-auth-token': token },
+                cache: 'no-store'
+            });
+            if (!res.ok) throw new Error('Không thể tải lịch sử lộ trình.');
+            const data = await res.json();
+            return parseRoadmapHistory(data.history);
+        }
+
+        function parseRoadmapHistory(rawRoadmapData) {
+            if (!rawRoadmapData) return [];
+            if (Array.isArray(rawRoadmapData)) {
+                return rawRoadmapData.filter(item => item && typeof item.content === 'string').slice(0, 5);
+            }
+
+            if (typeof rawRoadmapData === 'string') {
+                try {
+                    const parsed = JSON.parse(rawRoadmapData);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter(item => item && typeof item.content === 'string').slice(0, 5);
+                    }
+                } catch (err) {
+                    // Older accounts stored one Markdown roadmap directly.
+                }
+                return [{ content: rawRoadmapData, created_at: null }];
+            }
+
+            return [];
+        }
+
+        function renderRoadmapHistory() {
+            const historyEl = document.getElementById('roadmap-history');
+            document.getElementById('roadmap-history-title').textContent =
+                `Lịch sử lộ trình (${roadmapHistory.length}/5)`;
+            historyEl.innerHTML = roadmapHistory.map((item, index) => {
+                const createdLabel = item.created_at
+                    ? new Date(item.created_at).toLocaleString('vi-VN')
+                    : 'Bản đã lưu trước đây';
+                const label = index === 0
+                    ? `Mới nhất - ${createdLabel}`
+                    : `Bản ${index + 1} - ${createdLabel}`;
+                return `<button class="roadmap-history-btn" data-index="${index}" onclick="showRoadmap(${index})">${label}</button>`;
+            }).join('');
+        }
+
+        function showRoadmap(index) {
+            const roadmap = roadmapHistory[index];
+            if (!roadmap) return;
+
+            document.querySelectorAll('.roadmap-history-btn').forEach((button, buttonIndex) => {
+                button.classList.toggle('active', buttonIndex === index);
+            });
+
+            const targetEl = document.getElementById('roadmap-html-content');
+            targetEl.innerHTML = marked.parse(roadmap.content);
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(targetEl, {
+                    delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false},
+                        {left: "\\(", right: "\\)", display: false},
+                        {left: "\\[", right: "\\]", display: true}
+                    ],
+                    throwOnError: false
+                });
+            }
         }
 
         async function generateRoadmap() {
@@ -226,7 +312,11 @@
                 
                 if (res.ok) {
                     const data = await res.json();
-                    location.reload();
+                    roadmapHistory = parseRoadmapHistory(data.history);
+                    document.getElementById('roadmap-empty').style.display = 'none';
+                    document.getElementById('roadmap-view').style.display = 'grid';
+                    renderRoadmapHistory();
+                    showRoadmap(0);
                 } else {
                     alert('Lỗi khi tạo lộ trình. Vui lòng thử lại sau.');
                 }

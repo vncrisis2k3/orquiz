@@ -70,6 +70,13 @@ CREATE TABLE IF NOT EXISTS results (
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 6. System Settings Table
+CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Index and View
 CREATE INDEX IF NOT EXISTS idx_user_total_points ON users(total_points DESC);
 CREATE OR REPLACE VIEW leaderboard AS

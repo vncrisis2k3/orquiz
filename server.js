@@ -17,7 +17,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'eduflow_secret';
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+let geminiApiKey = process.env.GEMINI_API_KEY || '';
+let geminiApiKeySource = geminiApiKey ? 'environment' : 'none';
+let geminiSettingsLoaded = false;
 
 app.use(cors());
 app.use(express.json());
@@ -51,6 +53,46 @@ const adminAuth = async (req, res, next) => {
         res.status(500).json({ msg: 'Server Error in Admin Auth' });
     }
 };
+
+async function ensureSystemSettingsTable() {
+    await db.query(`
+        CREATE TABLE IF NOT EXISTS system_settings (
+            setting_key VARCHAR(100) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+}
+
+async function loadGeminiApiKey() {
+    if (geminiSettingsLoaded) return geminiApiKey;
+
+    await ensureSystemSettingsTable();
+    const result = await db.query(
+        'SELECT setting_value FROM system_settings WHERE setting_key = $1',
+        ['gemini_api_key']
+    );
+    if (result.rows[0]?.setting_value) {
+        geminiApiKey = result.rows[0].setting_value;
+        geminiApiKeySource = 'database';
+    }
+    geminiSettingsLoaded = true;
+    return geminiApiKey;
+}
+
+async function getGeminiClient() {
+    const apiKey = await loadGeminiApiKey();
+    if (!apiKey) {
+        throw new Error('Gemini API key chưa được cấu hình.');
+    }
+    return new GoogleGenerativeAI(apiKey);
+}
+
+function maskApiKey(apiKey) {
+    if (!apiKey) return '';
+    if (apiKey.length <= 8) return '********';
+    return `${apiKey.slice(0, 4)}${'*'.repeat(Math.min(20, apiKey.length - 8))}${apiKey.slice(-4)}`;
+}
 
 // 0. Auth Endpoints
 app.post('/api/register', async (req, res) => {
@@ -533,6 +575,54 @@ app.get('/api/admin/dashboard-stats', [auth, adminAuth], async (req, res) => {
     }
 });
 
+app.get('/api/admin/settings/gemini', [auth, adminAuth], async (req, res) => {
+    try {
+        const apiKey = await loadGeminiApiKey();
+        res.json({
+            configured: Boolean(apiKey),
+            masked_key: maskApiKey(apiKey),
+            source: geminiApiKeySource
+        });
+    } catch (err) {
+        console.error('Load Gemini Settings Error:', err);
+        res.status(500).json({ msg: 'Không thể tải cấu hình Gemini.' });
+    }
+});
+
+app.put('/api/admin/settings/gemini', [auth, adminAuth], async (req, res) => {
+    const apiKey = typeof req.body.api_key === 'string' ? req.body.api_key.trim() : '';
+    if (!apiKey) {
+        return res.status(400).json({ msg: 'API key Gemini không được để trống.' });
+    }
+    if (apiKey.length < 20 || /\s/.test(apiKey)) {
+        return res.status(400).json({ msg: 'API key Gemini không hợp lệ.' });
+    }
+
+    try {
+        await ensureSystemSettingsTable();
+        await db.query(
+            `INSERT INTO system_settings (setting_key, setting_value, updated_at)
+             VALUES ($1, $2, CURRENT_TIMESTAMP)
+             ON CONFLICT (setting_key)
+             DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP`,
+            ['gemini_api_key', apiKey]
+        );
+        geminiApiKey = apiKey;
+        geminiApiKeySource = 'database';
+        geminiSettingsLoaded = true;
+
+        res.json({
+            msg: 'Đã cập nhật Gemini API key.',
+            configured: true,
+            masked_key: maskApiKey(apiKey),
+            source: 'database'
+        });
+    } catch (err) {
+        console.error('Update Gemini Settings Error:', err);
+        res.status(500).json({ msg: 'Không thể lưu Gemini API key.' });
+    }
+});
+
 // Admin: Get Quiz Questions
 app.get('/api/admin/quiz/:id/questions', [auth, adminAuth], async (req, res) => {
     try {
@@ -661,7 +751,8 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
         }
 
         // Use Gemini to parse the extracted text into structured questions
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const gemini = await getGeminiClient();
+        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `Bạn là một chuyên gia soạn đề thi. Hãy trích xuất các câu hỏi trắc nghiệm từ văn bản sau đây.
         Yêu cầu:
         1. Trả về định dạng JSON là một mảng các đối tượng.
@@ -833,7 +924,8 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
     const { subject_id, grade, count, subject_name } = req.body;
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const gemini = await getGeminiClient();
+        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
         // Improve prompt for JSON reliability and LaTeX formatting
         const prompt = `
             Bạn là một chuyên gia biên soạn đề thi trắc nghiệm theo chuẩn của Bộ Giáo dục và Đào tạo Việt Nam.
@@ -1040,7 +1132,8 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
             }
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const gemini = await getGeminiClient();
+        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `
         Bạn là một cố vấn học tập AI thông minh. Hãy phân tích kết quả bài thi sau và đưa ra lộ trình học tập.
         
@@ -1090,14 +1183,14 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
     }
 });
 
-// AI Chat Tutor per Subject
+// AI Chat Tutor
 app.post('/api/chat', auth, async (req, res) => {
-    const { subject_name, message, history } = req.body;
+    const { message, history } = req.body;
     if (!message) return res.status(400).json({ msg: 'Tin nhắn không được để trống.' });
 
     try {
         const systemText = `Bạn là một Gia sư AI chuyên nghiệp, tận tâm và giàu kinh nghiệm tại Việt Nam.
-Nhiệm vụ của bạn là hỗ trợ học sinh học tập và giải đáp mọi thắc mắc liên quan đến môn học: ${subject_name || 'Học tập'}.
+Nhiệm vụ của bạn là hỗ trợ học sinh học tập và giải đáp thắc mắc về mọi môn học.
 Hãy tuân thủ các quy tắc sau:
 1. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn, súc tích, đi thẳng vào câu hỏi, tránh giải thích dài dòng hoặc lan man.
 2. Trình bày lời giải chi tiết, từng bước một nếu là bài toán/bài tập, nhưng giữ các bước giải rõ ràng, ngắn gọn và dễ hiểu nhất.
@@ -1107,7 +1200,8 @@ Hãy tuân thủ các quy tắc sau:
 6. Nếu câu hỏi không rõ ràng, hãy lịch sự hỏi lại hoặc đưa ra các trường hợp giả định để giải thích.
 7. Xưng hô với người dùng là "Bạn" và gọi bản thân là "Mình" (xưng hô Bạn - Mình). Tuyệt đối không xưng hô Thầy/Cô - Em hoặc các đại từ xưng hô khác.`;
 
-        const model = genAI.getGenerativeModel({
+        const gemini = await getGeminiClient();
+        const model = gemini.getGenerativeModel({
             model: "gemini-2.5-flash",
             systemInstruction: { parts: [{ text: systemText }] }
         });
@@ -1132,12 +1226,57 @@ Hãy tuân thủ các quy tắc sau:
     }
 });
 
+function parseRoadmapHistory(rawRoadmapData) {
+    if (!rawRoadmapData) return [];
+
+    if (Array.isArray(rawRoadmapData)) {
+        return rawRoadmapData.filter(item => item && typeof item.content === 'string');
+    }
+
+    if (typeof rawRoadmapData === 'string') {
+        try {
+            const parsed = JSON.parse(rawRoadmapData);
+            if (Array.isArray(parsed)) {
+                return parsed.filter(item => item && typeof item.content === 'string');
+            }
+        } catch (err) {
+            // Legacy roadmap_data values contain the Markdown directly.
+        }
+
+        return [{ content: rawRoadmapData, created_at: null }];
+    }
+
+    return [];
+}
+
+function buildRoadmapHistory(rawRoadmapData, roadmapText) {
+    const history = parseRoadmapHistory(rawRoadmapData);
+    return JSON.stringify([
+        { content: roadmapText, created_at: new Date().toISOString() },
+        ...history
+    ].slice(0, 5));
+}
+
+app.get('/api/roadmap/history', auth, async (req, res) => {
+    try {
+        const result = await db.query('SELECT roadmap_data FROM users WHERE id = $1', [req.user.id]);
+        const history = parseRoadmapHistory(result.rows[0]?.roadmap_data).slice(0, 5);
+        res.json({ history });
+    } catch (err) {
+        console.error('Roadmap History Error:', err);
+        res.status(500).json({ msg: 'Không thể tải lịch sử lộ trình.' });
+    }
+});
+
 // 15. Generate Personalized Study Roadmap
 app.post('/api/roadmap/generate', auth, async (req, res) => {
+    let currentRoadmapData = null;
+
     try {
         // 1. Get User Survey and Results
         const userRes = await db.query('SELECT survey_data, roadmap_data FROM users WHERE id = $1', [req.user.id]);
         const user = userRes.rows[0];
+        currentRoadmapData = user.roadmap_data;
         const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : (user.survey_data || {});
 
         const resultsRes = await db.query(`
@@ -1152,7 +1291,8 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
         const results = resultsRes.rows;
 
         // 2. Prepare AI Prompt
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const gemini = await getGeminiClient();
+        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `
             Bạn là một chuyên gia giáo dục cao cấp. Hãy xây dựng một LỘ TRÌNH HỌC TẬP CÁ NHÂN HÓA trong 4 tuần cho học sinh dựa trên thông tin sau:
             
@@ -1182,9 +1322,10 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
         const roadmapText = response.text();
 
         // 3. Save to DB
-        await db.query('UPDATE users SET roadmap_data = $1 WHERE id = $2', [roadmapText, req.user.id]);
+        const roadmapHistory = buildRoadmapHistory(currentRoadmapData, roadmapText);
+        await db.query('UPDATE users SET roadmap_data = $1 WHERE id = $2', [roadmapHistory, req.user.id]);
 
-        res.json({ msg: 'Roadmap generated', roadmap: roadmapText });
+        res.json({ msg: 'Roadmap generated', roadmap: roadmapText, history: JSON.parse(roadmapHistory) });
     } catch (err) {
         console.error("Roadmap Gen Error:", err);
         const isQuotaError = err.message && (err.message.includes("429") || err.message.includes("quota") || err.message.includes("Quota"));
@@ -1192,11 +1333,18 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
              console.log("Quota exceeded. Falling back to Mock roadmap...");
              const roadmapText = "### Lộ trình học tập cá nhân hóa 4 tuần (Dữ liệu thử nghiệm - Hết hạn ngạch API)\n\n* **Tuần 1: Ôn tập cốt lõi**\n  * Trọng tâm: Tập trung nắm vững lại các khái niệm cơ bản dựa trên kết quả khảo sát của bạn.\n  * Bài tập: Hoàn thành 2 bài kiểm tra trắc nghiệm cơ bản.\n* **Tuần 2: Nâng cao kỹ năng**\n  * Trọng tâm: Ôn luyện chuyên sâu các phần kiến thức còn yếu.\n  * Bài tập: Giải các bài tập tự luyện và ghi chú lại các lỗi thường gặp.\n* **Tuần 3: Luyện đề tổng hợp**\n  * Trọng tâm: Bắt đầu làm quen với các đề thi có thời gian làm bài thực tế.\n* **Tuần 4: Đánh giá & Điều chỉnh**\n  * Trọng tâm: Kiểm tra lại các lỗ hổng kiến thức cuối cùng để sẵn sàng cho bài thi chính thức.";
              try {
-                 await db.query('UPDATE users SET roadmap_data = $1 WHERE id = $2', [roadmapText, req.user.id]);
+                 const roadmapHistory = buildRoadmapHistory(currentRoadmapData, roadmapText);
+                 await db.query('UPDATE users SET roadmap_data = $1 WHERE id = $2', [roadmapHistory, req.user.id]);
+                 return res.json({
+                     msg: 'Roadmap generated (MOCK)',
+                     roadmap: roadmapText,
+                     history: JSON.parse(roadmapHistory),
+                     is_mock: true
+                 });
              } catch (dbErr) {
                  console.error("DB Error in Mock Roadmap Fallback:", dbErr);
+                 return res.status(500).json({ msg: 'Failed to save mock roadmap', error: dbErr.message });
              }
-             return res.json({ msg: 'Roadmap generated (MOCK)', roadmap: roadmapText, is_mock: true });
         }
         res.status(500).json({ msg: 'Failed to generate roadmap', error: err.message });
     }
