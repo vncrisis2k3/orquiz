@@ -88,27 +88,13 @@ function updateNavbar() {
             <li><a href="practice.html">Luyện tập</a></li>
             <li><a href="roadmap.html">Lộ trình</a></li>
             <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
-            <li style="display: flex; align-items: center; margin-right: 10px;">
-                <a href="profile.html" class="nav-streak-badge" style="
-                    background: linear-gradient(135deg, #FF8A00, #FF4500);
-                    color: white !important;
-                    padding: 6px 14px;
-                    border-radius: 50px;
-                    font-weight: 700;
-                    font-size: 0.85rem;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    box-shadow: 0 4px 12px rgba(255,100,0,0.2);
-                    text-decoration: none;
-                    line-height: 1;
-                    transition: transform 0.2s ease;
-                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            <li><a href="profile.html" class="btn btn-outline">Trang cá nhân</a></li>
+            <li><a href="#" onclick="logout()" class="btn btn-primary">Đăng xuất</a></li>
+            <li class="nav-streak-item">
+                <a href="profile.html" class="nav-streak-badge">
                     🔥 <span id="nav-streak-count">0</span>
                 </a>
             </li>
-            <li><a href="profile.html" class="btn btn-outline">Trang cá nhân</a></li>
-            <li><a href="#" onclick="logout()" class="btn btn-primary">Đăng xuất</a></li>
         `;
     } else {
         if (heroSection) heroSection.style.display = 'block';

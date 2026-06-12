@@ -40,6 +40,8 @@
             top: -20%;
             left: -20%;
             border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
         }
         .auth-container {
             background: white;
@@ -50,6 +52,8 @@
             max-width: 450px;
             text-align: center;
             transition: all 0.5s ease;
+            position: relative;
+            z-index: 1;
         }
         .auth-container:hover {
             transform: translateY(-5px);
@@ -299,6 +303,12 @@
             font-weight: 600;
             color: #475569;
             margin-bottom: 6px;
+        }
+        @media (hover: none), (pointer: coarse) {
+            .auth-container:hover {
+                transform: none;
+                box-shadow: 0 40px 100px rgba(0,0,0,0.2);
+            }
         }
     </style>
 </head>
