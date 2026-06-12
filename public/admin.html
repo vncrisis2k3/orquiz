@@ -8,6 +8,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- Chart.js and KaTeX for Statistics and Question Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
     <style>
         :root {
             --sidebar-width: 280px;
@@ -160,6 +165,130 @@
             max-width: 450px;
             text-align: center;
         }
+
+        @media (max-width: 1024px) {
+            :root { --sidebar-width: 220px; }
+            .main-content { padding: 30px; }
+            .tool-card { padding: 28px; border-radius: 24px; }
+            .sidebar { padding: 28px 14px; }
+            .sidebar-nav li { padding: 14px 16px; border-radius: 14px; }
+        }
+
+        @media (max-width: 768px) {
+            .admin-wrapper {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                position: sticky;
+                top: 0;
+                width: 100%;
+                height: auto;
+                padding: 14px 14px 10px;
+                z-index: 200;
+                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+            }
+
+            .sidebar .logo {
+                margin-bottom: 12px;
+                font-size: 22px;
+            }
+
+            .sidebar-nav {
+                display: flex;
+                gap: 8px;
+                overflow-x: auto;
+                padding-bottom: 4px;
+                scrollbar-width: none;
+            }
+
+            .sidebar-nav::-webkit-scrollbar {
+                display: none;
+            }
+
+            .sidebar-nav li {
+                flex: 0 0 auto;
+                margin-bottom: 0;
+                white-space: nowrap;
+                padding: 10px 14px;
+                font-size: 14px;
+            }
+
+            .sidebar-nav li:hover,
+            .sidebar-nav li.active {
+                transform: none;
+                box-shadow: none;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 22px 16px 40px;
+                width: 100%;
+            }
+
+            .main-content h1 {
+                font-size: 28px;
+                line-height: 1.2;
+            }
+
+            .tool-card {
+                padding: 22px 16px;
+                border-radius: 20px;
+                margin-bottom: 24px;
+                overflow-x: auto;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            .stat-box {
+                padding: 20px 16px;
+                border-radius: 20px;
+            }
+
+            .stat-box h3 {
+                font-size: 28px;
+            }
+
+            .main-content [style*="grid-template-columns: 1fr 1fr"],
+            .main-content [style*="grid-template-columns: 1fr 1fr 1fr"],
+            .main-content [style*="grid-template-columns: 1fr 2fr"] {
+                grid-template-columns: 1fr !important;
+            }
+
+            .ranking-table {
+                min-width: 680px;
+            }
+
+            #quiz-preview-modal > div {
+                width: calc(100% - 24px) !important;
+                max-height: 88vh !important;
+                padding: 24px 16px !important;
+                border-radius: 22px !important;
+            }
+
+            .admin-login-card {
+                width: calc(100% - 28px);
+                padding: 32px 20px;
+                border-radius: 22px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content h1 {
+                font-size: 24px;
+            }
+
+            .tool-card h2 {
+                font-size: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -220,7 +349,8 @@
         <aside class="sidebar">
             <a href="index.html" class="logo">Edu<span>Flow</span></a>
             <ul class="sidebar-nav">
-                <li class="active" onclick="showSection('users', this)">👥 Quản lý User</li>
+                <li class="active" onclick="showSection('dashboard', this)">📊 Dashboard</li>
+                <li onclick="showSection('users', this)">👥 Quản lý User</li>
                 <li onclick="showSection('quizzes', this)">📝 Quản lý Đề thi</li>
                 <li onclick="showSection('scan', this)">📄 Quét file PDF</li>
                 <li onclick="showSection('ai-gen', this)">✨ Tạo đề bằng AI</li>
@@ -230,15 +360,64 @@
         </aside>
 
         <main class="main-content">
-            <div class="stats-row">
-                <div class="stat-box"><span>Người dùng</span><h3 id="stat-users">0</h3></div>
-                <div class="stat-box"><span>Đề thi</span><h3 id="stat-quizzes">0</h3></div>
-                <div class="stat-box"><span>Môn học</span><h3>8</h3></div>
-                <div class="stat-box"><span>Trạng thái</span><h3 style="color: #10B981; font-size: 18px;">Đang hoạt động</h3></div>
-            </div>
-
             <!-- Sections -->
-            <section id="section-users" class="admin-section active">
+            <section id="section-dashboard" class="admin-section active">
+                <div class="stats-row">
+                    <div class="stat-box"><span>Người dùng</span><h3 id="stat-dashboard-users">0</h3></div>
+                    <div class="stat-box"><span>Đề thi</span><h3 id="stat-dashboard-quizzes">0</h3></div>
+                    <div class="stat-box"><span>Lượt thi</span><h3 id="stat-dashboard-attempts">0</h3></div>
+                    <div class="stat-box"><span>Điểm trung bình</span><h3 id="stat-dashboard-avg-score">0</h3></div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
+                    <div class="tool-card" style="margin-bottom: 0; padding: 25px;">
+                        <h3 style="margin-bottom: 20px; color: var(--primary);">📈 Lượt thi theo ngày (7 ngày qua)</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-attempts-daily"></canvas>
+                        </div>
+                    </div>
+                    <div class="tool-card" style="margin-bottom: 0; padding: 25px;">
+                        <h3 style="margin-bottom: 20px; color: var(--primary);">📊 Điểm trung bình theo môn học</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-scores-subject"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
+                    <div class="tool-card" style="margin-bottom: 0; padding: 25px;">
+                        <h3 style="margin-bottom: 20px; color: var(--primary);">🎯 Phân bố học lực học sinh</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-score-dist"></canvas>
+                        </div>
+                    </div>
+                    <div class="tool-card" style="margin-bottom: 0; padding: 25px;">
+                        <h3 style="margin-bottom: 20px; color: var(--primary);">🔥 Độ phổ biến các môn học</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="chart-attempts-subject"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tool-card" style="margin-top: 30px; padding: 25px;">
+                    <h3 style="margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 8px;">⏱️ Lượt thi gần đây</h3>
+                    <table class="ranking-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #f1f5f9; text-align: left;">
+                                <th style="padding-bottom: 12px; color: #64748b;">Học sinh</th>
+                                <th style="padding-bottom: 12px; color: #64748b;">Đề thi</th>
+                                <th style="padding-bottom: 12px; color: #64748b;">Điểm số</th>
+                                <th style="padding-bottom: 12px; text-align: right; color: #64748b;">Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-attempts-list">
+                            <tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-gray);">Đang tải dữ liệu...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="section-users" class="admin-section">
                 <div class="tool-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                         <h2>Danh sách người dùng</h2>
@@ -385,11 +564,36 @@
 
                     <div style="display: flex; gap: 15px; margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ddd;">
                         <button class="btn btn-outline" onclick="addManualQuestion()" style="flex: 1;">+ Thêm câu hỏi</button>
+                        <button class="btn btn-secondary" onclick="previewCurrentQuiz()" style="flex: 1; background: #64748b; color: white;">👁️ Xem trước đề thi</button>
                         <button class="btn btn-primary" onclick="saveManualQuiz()" style="flex: 2;" id="btn-save-manual">Lưu đề thi ngay</button>
                     </div>
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Preview Student View Modal -->
+    <div id="quiz-preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(8px); z-index: 1100; align-items: center; justify-content: center; animation: fadeIn 0.3s ease;">
+        <div style="background: white; padding: 40px; border-radius: 30px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); position: relative; border: 1px solid rgba(255,122,0,0.15);">
+            <button onclick="closeQuizPreview()" style="position: absolute; right: 25px; top: 25px; background: #f1f5f9; border: none; color: #64748b; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                <span style="font-size: 28px;">👁️</span>
+                <div>
+                    <h2 id="preview-modal-title" style="margin: 0; color: var(--secondary);">Xem trước đề thi (Góc nhìn học sinh)</h2>
+                    <p id="preview-modal-meta" style="margin: 4px 0 0 0; color: var(--text-gray); font-size: 0.95rem; font-weight: 500;"></p>
+                </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #f1f5f9; margin-bottom: 25px;">
+            
+            <div id="preview-modal-questions" style="display: flex; flex-direction: column; gap: 25px;">
+                <!-- Mock student questions list will be generated here -->
+            </div>
+            
+            <div style="margin-top: 35px; text-align: right;">
+                <button class="btn btn-primary" onclick="closeQuizPreview()" style="padding: 12px 30px; border-radius: 12px;">Đóng Xem trước</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -435,6 +639,8 @@
         }
 
         async function initDashboard() {
+            showSection('dashboard', document.querySelector('.sidebar-nav li'));
+            await loadDashboardStats();
             await loadUsers();
             await loadQuizzes();
             await loadSubjects();
@@ -447,7 +653,8 @@
                 if (res.status === 401) return checkAdmin();
                 const users = await res.json();
                 if (!Array.isArray(users)) return;
-                document.getElementById('stat-users').textContent = users.length;
+                const statUsers = document.getElementById('stat-users');
+                if (statUsers) statUsers.textContent = users.length;
                 document.getElementById('admin-users-list').innerHTML = users.map(u => `
                     <tr>
                         <td>${u.id}</td>
@@ -470,7 +677,8 @@
                 if (res.status === 401) return checkAdmin();
                 const quizzes = await res.json();
                 if (!Array.isArray(quizzes)) return;
-                document.getElementById('stat-quizzes').textContent = quizzes.length;
+                const statQuizzes = document.getElementById('stat-quizzes');
+                if (statQuizzes) statQuizzes.textContent = quizzes.length;
                 document.getElementById('admin-quizzes-list').innerHTML = quizzes.map(q => `
                     <tr>
                         <td>${q.id}</td>
@@ -502,6 +710,10 @@
             document.querySelectorAll('.sidebar-nav li').forEach(l => l.classList.remove('active'));
             document.getElementById(`section-${name}`).classList.add('active');
             if (element) element.classList.add('active');
+            
+            if (name === 'dashboard') {
+                loadDashboardStats();
+            }
         }
 
         function toggleAdminAuth(type) {
@@ -585,6 +797,7 @@
             formData.append('subject_id', subject_id);
             formData.append('grade', grade);
             formData.append('duration', duration);
+            formData.append('preview', 'true');
             try {
                 const res = await fetch(`${API_URL}/admin/scan-quiz`, {
                     method: 'POST',
@@ -592,8 +805,9 @@
                     body: formData
                 });
                 if (res.ok) {
-                    alert('Thành công!');
-                    loadQuizzes();
+                    const data = await res.json();
+                    alert('✨ Quét tài liệu thành công! Hãy xem lại, chỉnh sửa hoặc xem trước đề thi bên dưới.');
+                    loadPreviewIntoEditor(data);
                 } else {
                     const data = await res.json();
                     alert('Lỗi: ' + data.msg);
@@ -641,37 +855,62 @@
 
         let manualQuestionCount = 0;
         function addManualQuestion() {
+            addQuestionToEditor();
+        }
+
+        function addQuestionToEditor(q = null) {
             manualQuestionCount++;
             const container = document.getElementById('manual-questions-list');
             const qDiv = document.createElement('div');
             qDiv.className = 'manual-question-block';
             qDiv.style = "background: white; padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; margin-bottom: 25px; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);";
+            
+            const content = q ? q.content : '';
+            const optA = q ? q.option_a : '';
+            const optB = q ? q.option_b : '';
+            const optC = q ? q.option_c : '';
+            const optD = q ? q.option_d : '';
+            const correct = q ? q.correct_option : 'A';
+            const explain = q ? q.explanation : '';
+
             qDiv.innerHTML = `
-                <button onclick="this.parentElement.remove()" style="position: absolute; right: 15px; top: 15px; background: #fee2e2; border: none; color: #ef4444; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
+                <button onclick="this.parentElement.remove(); reindexQuestions();" style="position: absolute; right: 15px; top: 15px; background: #fee2e2; border: none; color: #ef4444; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
                 <div class="form-group" style="margin-bottom: 20px;">
-                    <label style="color: var(--primary); font-size: 1.1rem;">Câu hỏi ${manualQuestionCount}</label>
-                    <textarea class="q-content" placeholder="Nhập nội dung câu hỏi..." style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; height: 100px; font-family: inherit; margin-top: 10px;"></textarea>
+                    <label style="color: var(--primary); font-size: 1.1rem;" class="q-label">Câu hỏi ${manualQuestionCount}</label>
+                    <textarea class="q-content" placeholder="Nhập nội dung câu hỏi..." style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; height: 100px; font-family: inherit; margin-top: 10px;">${content}</textarea>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="form-group"><label>Đáp án A</label><input type="text" class="q-a" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></div>
-                    <div class="form-group"><label>Đáp án B</label><input type="text" class="q-b" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></div>
-                    <div class="form-group"><label>Đáp án C</label><input type="text" class="q-c" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></div>
-                    <div class="form-group"><label>Đáp án D</label><input type="text" class="q-d" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></div>
+                    <div class="form-group"><label>Đáp án A</label><input type="text" class="q-a" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optA}"></div>
+                    <div class="form-group"><label>Đáp án B</label><input type="text" class="q-b" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optB}"></div>
+                    <div class="form-group"><label>Đáp án C</label><input type="text" class="q-c" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optC}"></div>
+                    <div class="form-group"><label>Đáp án D</label><input type="text" class="q-d" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optD}"></div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px; background: #fff7ed; padding: 15px; border-radius: 12px;">
                     <div class="form-group">
                         <label>Đáp án đúng</label>
                         <select class="q-correct" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;">
-                            <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                            <option value="A" ${correct === 'A' ? 'selected' : ''}>A</option>
+                            <option value="B" ${correct === 'B' ? 'selected' : ''}>B</option>
+                            <option value="C" ${correct === 'C' ? 'selected' : ''}>C</option>
+                            <option value="D" ${correct === 'D' ? 'selected' : ''}>D</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Giải thích tại sao đúng (tùy chọn)</label>
-                        <input type="text" class="q-explain" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;" placeholder="Giải thích cho học sinh...">
+                        <input type="text" class="q-explain" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;" placeholder="Giải thích cho học sinh..." value="${explain}">
                     </div>
                 </div>
             `;
             container.appendChild(qDiv);
+        }
+
+        function reindexQuestions() {
+            const blocks = document.querySelectorAll('.manual-question-block');
+            manualQuestionCount = 0;
+            blocks.forEach((block) => {
+                manualQuestionCount++;
+                block.querySelector('.q-label').textContent = `Câu hỏi ${manualQuestionCount}`;
+            });
         }
 
         async function saveManualQuiz() {
@@ -737,21 +976,354 @@
             let width = 0;
             const interval = setInterval(() => { if (width < 90) { width += 5; progress.style.width = width + '%'; } }, 500);
             try {
-                const res = await fetch(`${API_URL}/admin/ai-generate-quiz`, {
+                const res = await fetch(`${API_URL}/admin/ai-generate-quiz?preview=true`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-auth-token': localStorage.getItem('token') },
                     body: JSON.stringify({ subject_id, grade, count, subject_name })
                 });
                 if (res.ok) {
                     progress.style.width = '100%';
-                    alert('🎉 AI đã tạo bộ đề thành công.');
-                    window.location.reload();
+                    const data = await res.json();
+                    alert('🎉 AI đã biên soạn đề thi thành công! Hãy xem lại, chỉnh sửa hoặc xem trước đề thi bên dưới.');
+                    loadPreviewIntoEditor(data);
                 } else {
                     const data = await res.json();
                     alert('❌ Lỗi AI: ' + data.msg);
                 }
             } catch (err) { alert('❌ Lỗi kết nối'); }
             finally { clearInterval(interval); btn.disabled = false; loader.style.display = 'none'; }
+        }
+
+        // Load previewed data into manual quiz builder
+        function loadPreviewIntoEditor(data) {
+            // Switch to manual section
+            const manualLi = Array.from(document.querySelectorAll('.sidebar-nav li')).find(li => li.textContent.includes('Tạo đề thủ công'));
+            showSection('manual', manualLi);
+
+            document.getElementById('man-title').value = data.title || '';
+            document.getElementById('man-subject').value = data.subject_id || '';
+            document.getElementById('man-grade').value = data.grade || '12';
+            document.getElementById('man-duration').value = data.duration || 15;
+
+            const container = document.getElementById('manual-questions-list');
+            container.innerHTML = '<h4 style="margin-bottom: 15px; color: var(--secondary);">2. Danh sách câu hỏi</h4>';
+            manualQuestionCount = 0;
+
+            if (data.questions && data.questions.length) {
+                data.questions.forEach(q => {
+                    addQuestionToEditor(q);
+                });
+            }
+        }
+
+        let dashboardCharts = {};
+
+        async function loadDashboardStats() {
+            const token = localStorage.getItem('token');
+            try {
+                const res = await fetch(`${API_URL}/admin/dashboard-stats`, { headers: { 'x-auth-token': token } });
+                if (res.status === 401) return checkAdmin();
+                const data = await res.json();
+                
+                document.getElementById('stat-dashboard-users').textContent = data.users;
+                document.getElementById('stat-dashboard-quizzes').textContent = data.quizzes;
+                document.getElementById('stat-dashboard-attempts').textContent = data.attempts;
+                document.getElementById('stat-dashboard-avg-score').textContent = data.avgScore + '/10';
+
+                // Update secondary stats elements
+                const statUsersEl = document.getElementById('stat-users');
+                if (statUsersEl) statUsersEl.textContent = data.users;
+                const statQuizzesEl = document.getElementById('stat-quizzes');
+                if (statQuizzesEl) statQuizzesEl.textContent = data.quizzes;
+
+                // Destroy existing charts to prevent canvas sharing issues
+                Object.values(dashboardCharts).forEach(chart => {
+                    if (chart) chart.destroy();
+                });
+                dashboardCharts = {};
+
+                // --- 1. Line Chart: Attempts Daily ---
+                const ctxAttempts = document.getElementById('chart-attempts-daily').getContext('2d');
+                const attemptsData = [];
+                const attemptsLabels = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const labelStr = `${d.getDate()}/${d.getMonth()+1}`;
+                    attemptsLabels.push(labelStr);
+                    
+                    const found = data.attemptsDaily.find(item => item.date === dateStr);
+                    attemptsData.push(found ? parseInt(found.count) : 0);
+                }
+
+                const gradientAttempts = ctxAttempts.createLinearGradient(0, 0, 0, 300);
+                gradientAttempts.addColorStop(0, 'rgba(255, 122, 0, 0.4)');
+                gradientAttempts.addColorStop(1, 'rgba(255, 122, 0, 0.0)');
+
+                dashboardCharts.attempts = new Chart(ctxAttempts, {
+                    type: 'line',
+                    data: {
+                        labels: attemptsLabels,
+                        datasets: [{
+                            label: 'Lượt thi',
+                            data: attemptsData,
+                            borderColor: '#FF7A00',
+                            borderWidth: 3,
+                            backgroundColor: gradientAttempts,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#FF7A00',
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+
+                // --- 2. Bar Chart: Average Scores per Subject ---
+                const ctxScores = document.getElementById('chart-scores-subject').getContext('2d');
+                const scoreLabels = data.scoresSubject.map(s => s.subject_name);
+                const scoreValues = data.scoresSubject.map(s => parseFloat(s.avg_score));
+
+                const gradientScores = ctxScores.createLinearGradient(0, 0, 0, 300);
+                gradientScores.addColorStop(0, '#FF7A00');
+                gradientScores.addColorStop(1, '#FFB800');
+
+                dashboardCharts.scores = new Chart(ctxScores, {
+                    type: 'bar',
+                    data: {
+                        labels: scoreLabels.length ? scoreLabels : ['Chưa có dữ liệu'],
+                        datasets: [{
+                            label: 'Điểm trung bình',
+                            data: scoreValues.length ? scoreValues : [0],
+                            backgroundColor: gradientScores,
+                            borderRadius: 10,
+                            maxBarThickness: 40
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { min: 0, max: 10, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+
+                // --- 3. Doughnut Chart: Attempts per Subject ---
+                const ctxAttemptsSub = document.getElementById('chart-attempts-subject').getContext('2d');
+                const subLabels = data.attemptsSubject.map(s => s.subject_name);
+                const subValues = data.attemptsSubject.map(s => parseInt(s.count));
+
+                dashboardCharts.attemptsSub = new Chart(ctxAttemptsSub, {
+                    type: 'doughnut',
+                    data: {
+                        labels: subLabels.length ? subLabels : ['Chưa có dữ liệu'],
+                        datasets: [{
+                            data: subValues.length ? subValues : [1],
+                            backgroundColor: [
+                                '#FF7A00', '#3B82F6', '#10B981', '#F59E0B', 
+                                '#8B5CF6', '#EC4899', '#EF4444', '#6B7280', '#06B6D4'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Outfit' } } }
+                        },
+                        cutout: '60%'
+                    }
+                });
+
+                // --- 4. Polar Area Chart: Score Distribution ---
+                const ctxScoreDist = document.getElementById('chart-score-dist').getContext('2d');
+                const dist = data.scoreDist || { weak: 0, average: 0, good: 0, excellent: 0 };
+                
+                dashboardCharts.scoreDist = new Chart(ctxScoreDist, {
+                    type: 'polarArea',
+                    data: {
+                        labels: ['Dưới trung bình (<5)', 'Trung bình (5-6.5)', 'Khá (6.5-8)', 'Giỏi (8-10)'],
+                        datasets: [{
+                            data: [parseInt(dist.weak), parseInt(dist.average), parseInt(dist.good), parseInt(dist.excellent)],
+                            backgroundColor: [
+                                'rgba(239, 68, 68, 0.7)',
+                                'rgba(245, 158, 11, 0.7)',
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(16, 185, 129, 0.7)'
+                            ],
+                            borderColor: '#ffffff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Outfit' } } }
+                        },
+                        scales: {
+                            r: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { display: false } }
+                        }
+                    }
+                });
+
+                // Render recent attempts list
+                document.getElementById('recent-attempts-list').innerHTML = data.recentAttempts.map(r => `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 12px 0; font-weight: 600; color: #334155;">${r.username}</td>
+                        <td style="padding: 12px 0; color: #475569;">${r.quiz_title}</td>
+                        <td style="padding: 12px 0;"><span style="font-weight: 800; color: ${parseFloat(r.score) >= 8 ? '#10B981' : parseFloat(r.score) >= 5 ? '#FF7A00' : '#EF4444'};">${r.score}</span></td>
+                        <td style="padding: 12px 0; color: #94a3b8; font-size: 0.85rem; text-align: right;">${r.date}</td>
+                    </tr>
+                `).join('');
+
+            } catch (err) {
+                console.error("Load dashboard stats error", err);
+            }
+        }
+
+        // Preview current quiz in student view modal
+        function previewCurrentQuiz() {
+            const title = document.getElementById('man-title').value || 'Đề thi không tên';
+            const subject_name = document.getElementById('man-subject').options[document.getElementById('man-subject').selectedIndex]?.text || '';
+            const grade = document.getElementById('man-grade').value;
+            const duration = document.getElementById('man-duration').value;
+            
+            const questionBlocks = document.querySelectorAll('.manual-question-block');
+            const questions = Array.from(questionBlocks).map(block => ({
+                content: block.querySelector('.q-content').value,
+                option_a: block.querySelector('.q-a').value,
+                option_b: block.querySelector('.q-b').value,
+                option_c: block.querySelector('.q-c').value,
+                option_d: block.querySelector('.q-d').value,
+                correct_option: block.querySelector('.q-correct').value,
+                explanation: block.querySelector('.q-explain').value
+            }));
+
+            if (questions.length === 0) return alert('Hãy thêm ít nhất 1 câu hỏi để xem trước!');
+
+            document.getElementById('preview-modal-title').textContent = title;
+            document.getElementById('preview-modal-meta').innerHTML = `⏱️ Thời gian: <b>${duration} phút</b> | 📚 Môn học: <b>${subject_name}</b> | 🎓 Khối: <b>Lớp ${grade}</b> | 📝 Số câu: <b>${questions.length} câu</b>`;
+            
+            const questionsContainer = document.getElementById('preview-modal-questions');
+            questionsContainer.innerHTML = '';
+
+            questions.forEach((q, index) => {
+                const qDiv = document.createElement('div');
+                qDiv.style = "background: #f8fafc; padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; position: relative;";
+                qDiv.innerHTML = `
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 12px; font-size: 1.05rem;">
+                        Câu ${index + 1}: <span class="math-target">${autoWrapMath(q.content || '(Trống)')}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
+                            <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">A.</span> <span class="math-target">${autoWrapMath(q.option_a || '(Trống)')}</span>
+                        </div>
+                        <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
+                            <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">B.</span> <span class="math-target">${autoWrapMath(q.option_b || '(Trống)')}</span>
+                        </div>
+                        <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
+                            <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">C.</span> <span class="math-target">${autoWrapMath(q.option_c || '(Trống)')}</span>
+                        </div>
+                        <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
+                            <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">D.</span> <span class="math-target">${autoWrapMath(q.option_d || '(Trống)')}</span>
+                        </div>
+                    </div>
+                    <div style="background: #f0fdf4; border: 1px dashed #bbf7d0; padding: 12px 18px; border-radius: 10px; font-size: 0.95rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                        <span>✅ <b>Đáp án đúng:</b></span>
+                        <span style="font-weight: 800; background: #166534; color: white; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.8rem;">${q.correct_option}</span>
+                        ${q.explanation ? `<span style="color: #475569; margin-left: 10px; font-style: italic;">(💡 ${autoWrapMath(q.explanation)})</span>` : ''}
+                    </div>
+                `;
+                questionsContainer.appendChild(qDiv);
+            });
+
+            document.getElementById('quiz-preview-modal').style.display = 'flex';
+
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(questionsContainer, {
+                    delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false},
+                        {left: "\\(", right: "\\)", display: false},
+                        {left: "\\[", right: "\\]", display: true}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        function closeQuizPreview() {
+            document.getElementById('quiz-preview-modal').style.display = 'none';
+        }
+
+        function autoWrapMath(text) {
+            if (!text) return '';
+            const placeholders = [];
+            let res = text.replace(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$)/g, (match) => {
+                placeholders.push(match);
+                return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+            });
+
+            const greekMap = {
+                'alpha': '\\alpha', 'beta': '\\beta', 'gamma': '\\gamma', 'delta': '\\delta',
+                'theta': '\\theta', 'phi': '\\phi', 'omega': '\\omega', 'sigma': '\\sigma', 'pi': '\\pi'
+            };
+
+            res = res.replace(/\b([yfx]\(?[x]?\)?'?\s*=\s*[-+*/^()0-9a-zA-Z\s]+)\b/g, (match) => {
+                const replacement = `$${match.trim()}$`;
+                placeholders.push(replacement);
+                return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+            });
+
+            res = res.replace(/([a-zA-Z0-9]+|\([^)]+\))\^([a-zA-Z0-9{}~_+-]+)/g, (match, base, exp) => {
+                const replacement = `$${base}^{${exp}}$`;
+                placeholders.push(replacement);
+                return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+            });
+
+            for (const [key, val] of Object.entries(greekMap)) {
+                const regex = new RegExp(`\\b${key}\\b`, 'gi');
+                res = res.replace(regex, () => {
+                    const replacement = `$${val}$`;
+                    placeholders.push(replacement);
+                    return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+                });
+            }
+
+            res = res.replace(/\b([0-9a-zA-Z]+)\/([0-9a-zA-Z]+)\b/g, (match, num, den) => {
+                const replacement = `$\\frac{${num}}{${den}}$`;
+                placeholders.push(replacement);
+                return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+            });
+
+            res = res.replace(/\\int\b/g, () => {
+                const replacement = `$\\int$`;
+                placeholders.push(replacement);
+                return `___MATH_PLACEHOLDER_${placeholders.length - 1}___`;
+            });
+
+            while (res.includes('___MATH_PLACEHOLDER_')) {
+                res = res.replace(/___MATH_PLACEHOLDER_(\d+)___/g, (match, index) => {
+                    return placeholders[parseInt(index)];
+                });
+            }
+
+            return res;
         }
 
         checkAdmin();

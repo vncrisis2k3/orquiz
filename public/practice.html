@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luyện tập không giới hạn thời gian - Edu-Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .practice-header {
+            background: linear-gradient(135deg, #FF8A00 0%, #E67E00 100%);
+            padding: 80px 0;
+            color: white;
+            border-radius: 0 0 50px 50px;
+            margin-bottom: 50px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(255, 122, 0, 0.15);
+        }
+        .practice-header::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+            border-radius: 50%;
+        }
+        .practice-container {
+            padding-bottom: 100px;
+        }
+        .practice-info-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.03);
+            margin-bottom: 50px;
+            border: 1px solid rgba(255, 122, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        .practice-info-icon {
+            font-size: 50px;
+            background: var(--primary-soft);
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 24px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+        .practice-info-text h3 {
+            color: var(--secondary);
+            font-size: 1.4rem;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+        .practice-info-text p {
+            color: var(--text-gray);
+            line-height: 1.6;
+        }
+        @media (max-width: 768px) {
+            .practice-info-card {
+                flex-direction: column;
+                text-align: center;
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body style="background: #F8FAFC;">
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <ul class="nav-links" id="nav-links">
+                <!-- Injected by JS -->
+            </ul>
+        </div>
+    </nav>
+
+    <header class="practice-header">
+        <div class="container">
+            <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 15px;">Luyện tập tự do</h1>
+            <p style="font-size: 1.1rem; opacity: 0.95; max-width: 600px; margin: 0 auto;">Rèn luyện kiến thức vững vàng với kho đề thi đa dạng, hoàn toàn không giới hạn thời gian làm bài.</p>
+        </div>
+    </header>
+
+    <main class="container practice-container">
+
+        <section class="reveal">
+            <div class="section-header" style="margin-bottom: 50px;">
+                <h2 style="font-size: 2rem; font-weight: 800;">Chọn môn học để bắt đầu luyện tập</h2>
+                <p style="font-size: 0.95rem; margin-top: 10px;">Lọc bài ôn luyện theo cấp lớp phù hợp với bạn:</p>
+                
+                <!-- Grade Selection -->
+                <div class="grade-selector" style="margin-top: 25px;">
+                    <button class="btn btn-outline grade-btn" data-grade="10" onclick="selectGrade(10)">Lớp 10</button>
+                    <button class="btn btn-outline grade-btn" data-grade="11" onclick="selectGrade(11)">Lớp 11</button>
+                    <button class="btn btn-primary grade-btn" data-grade="12" onclick="selectGrade(12)">Lớp 12</button>
+                </div>
+            </div>
+
+            <div class="subject-grid" id="subject-grid">
+                <!-- Subjects injected by JS -->
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-gray);">
+                    Đang tải danh sách môn học...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <p>&copy; 2026 Edu-Flow Platform. Mang lại kiến thức cho mọi người.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+        let currentGrade = 12;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            updateNavbar();
+            await checkUserGrade();
+            fetchSubjects();
+            initScrollReveal();
+        });
+
+        function updateNavbar() {
+            const navLinks = document.getElementById('nav-links');
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user) {
+                navLinks.innerHTML = `
+                    <li><a href="index.html#subjects">Kiểm tra</a></li>
+                    <li><a href="practice.html" style="color: var(--primary); font-weight: 700;">Luyện tập</a></li>
+                    <li><a href="roadmap.html">Lộ trình</a></li>
+                    <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
+                    <li><a href="profile.html" class="btn btn-outline" style="padding: 8px 18px; border-radius: 12px;">Trang cá nhân</a></li>
+                    <li><a href="#" onclick="logout()" class="btn btn-primary" style="padding: 8px 18px; border-radius: 12px;">Đăng xuất</a></li>
+                `;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+
+        async function checkUserGrade() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const res = await fetch(`${API_URL}/auth/user`, {
+                        headers: { 'x-auth-token': token }
+                    });
+                    if (res.ok) {
+                        const user = await res.json();
+                        if (user.survey_data) {
+                            const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : user.survey_data;
+                            if (survey.grade) {
+                                currentGrade = parseInt(survey.grade);
+                                selectGrade(currentGrade);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error checking user grade:", err);
+                }
+            }
+        }
+
+        function selectGrade(grade) {
+            currentGrade = grade;
+            document.querySelectorAll('.grade-btn').forEach(btn => {
+                if (btn.getAttribute('data-grade') == grade) {
+                    btn.classList.remove('btn-outline');
+                    btn.classList.add('btn-primary');
+                } else {
+                    btn.classList.add('btn-outline');
+                    btn.classList.remove('btn-primary');
+                }
+            });
+            fetchSubjects();
+        }
+
+        async function fetchSubjects() {
+            const subjectGrid = document.getElementById('subject-grid');
+            try {
+                const response = await fetch(`${API_URL}/subjects`);
+                const subjects = await response.json();
+
+                if (subjects.length > 0) {
+                    subjectGrid.innerHTML = '';
+                    subjects.forEach((subject, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'subject-card stagger-reveal';
+                        card.style.transitionDelay = `${index * 0.1}s`;
+                        
+                        const icon = getSubjectIcon(subject.slug);
+                        
+                        card.innerHTML = `
+                            <div class="subject-icon ${icon.color}">${icon.emoji}</div>
+                            <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--secondary); margin-bottom: 10px;">${subject.name}</h3>
+                            <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px; line-height: 1.5;">Luyện tập đề trắc nghiệm ${subject.name} Lớp ${currentGrade} không tính giờ.</p>
+                            <a href="#" onclick="startPractice(${subject.id})" class="btn btn-outline" style="width: 100%; border-radius: 16px; font-size: 0.9rem; padding: 10px 0;">Luyện tập ngay →</a>
+                        `;
+                        subjectGrid.appendChild(card);
+                    });
+                    
+                    if (window.refreshReveal) {
+                        window.refreshReveal();
+                    } else {
+                        document.querySelectorAll('.reveal, .stagger-reveal').forEach(el => el.classList.add('active'));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching subjects:', error);
+                subjectGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--danger);">Không thể kết nối đến máy chủ. Vui lòng tải lại trang.</div>';
+            }
+        }
+
+        function startPractice(subjectId) {
+            window.location.href = `quiz.html?subject=${subjectId}&grade=${currentGrade}&mode=practice`;
+        }
+
+        function getSubjectIcon(slug) {
+            const icons = {
+                'toan': { emoji: '📐', color: 'orange' },
+                'ly': { emoji: '⚡', color: 'red' },
+                'hoa': { emoji: '🧪', color: 'yellow' },
+                'sinh': { emoji: '🧬', color: 'green' },
+                'su': { emoji: '📜', color: 'blue' },
+                'dia': { emoji: '🌍', color: 'purple' },
+                'van': { emoji: '🖋️', color: 'brown' },
+                'tin': { emoji: '💻', color: 'cyan' },
+                'anh': { emoji: '🔤', color: 'red' }
+            };
+            return icons[slug] || { emoji: '📚', color: 'orange' };
+        }
+
+        function initScrollReveal() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.reveal, .stagger-reveal').forEach(el => observer.observe(el));
+            
+            window.refreshReveal = () => {
+                document.querySelectorAll('.reveal:not(.active), .stagger-reveal:not(.active)').forEach(el => observer.observe(el));
+            };
+        }
+    </script>
+</body>
+</html>

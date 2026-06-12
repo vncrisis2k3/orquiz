@@ -21,12 +21,18 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin BOOLEAN DEFAULT FALSE,
     survey_data JSONB,
     roadmap_data TEXT,
+    current_streak INT DEFAULT 0,
+    longest_streak INT DEFAULT 0,
+    last_activity_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Đảm bảo các cột tồn tại nếu bảng đã lỡ tạo trước đó
 ALTER TABLE users ADD COLUMN IF NOT EXISTS survey_data JSONB;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS roadmap_data TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak INT DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INT DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity_date DATE;
 
 -- 3. Quizzes Table
 CREATE TABLE IF NOT EXISTS quizzes (
@@ -77,7 +83,7 @@ const seedData = `
 INSERT INTO subjects (name, slug) VALUES 
 ('Toán', 'toan'), ('Vật Lý', 'ly'), ('Hóa Học', 'hoa'), 
 ('Sinh Học', 'sinh'), ('Lịch Sử', 'su'), ('Địa Lý', 'dia'), 
-('Ngữ Văn', 'van'), ('Tin Học', 'tin')
+('Ngữ Văn', 'van'), ('Tin Học', 'tin'), ('Tiếng Anh', 'anh')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Seed a Sample User (Password: admin123)

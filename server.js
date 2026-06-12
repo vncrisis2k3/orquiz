@@ -21,6 +21,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -53,20 +54,26 @@ const adminAuth = async (req, res, next) => {
 
 // 0. Auth Endpoints
 app.post('/api/register', async (req, res) => {
-    const { username, email, password, full_name, admin_code } = req.body;
+    const { username, email, password, full_name, admin_code, isGoogleRegister, avatar_url } = req.body;
     try {
         const userExists = await db.query('SELECT * FROM users WHERE email = $1 OR username = $2', [email, username]);
-        if (userExists.rows.length > 0) return res.status(400).json({ msg: 'User already exists' });
+        if (userExists.rows.length > 0) return res.status(400).json({ msg: 'Email hoặc tên đăng nhập đã được sử dụng.' });
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        let hashedPassword;
+        if (isGoogleRegister) {
+            const salt = await bcrypt.genSalt(10);
+            const randomPass = Math.random().toString(36).slice(-10);
+            hashedPassword = await bcrypt.hash(randomPass, salt);
+        } else {
+            const salt = await bcrypt.genSalt(10);
+            hashedPassword = await bcrypt.hash(password, salt);
+        }
 
-        // Check if registering as admin
         const isAdmin = admin_code && admin_code === (process.env.ADMIN_SECRET || 'EDUFLOW_ADMIN_2026');
 
         const newUser = await db.query(
-            'INSERT INTO users (username, email, password_hash, full_name, is_admin, survey_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, email, is_admin',
-            [username, email, hashedPassword, full_name, isAdmin, JSON.stringify(req.body.survey)]
+            'INSERT INTO users (username, email, password_hash, full_name, avatar_url, is_admin, survey_data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, email, is_admin',
+            [username, email, hashedPassword, full_name, avatar_url || null, isAdmin, JSON.stringify(req.body.survey)]
         );
 
         const payload = { user: { id: newUser.rows[0].id } };
@@ -76,7 +83,7 @@ app.post('/api/register', async (req, res) => {
         });
     } catch (err) {
         console.error(err.message);
-        res.status(500).json({ msg: 'Server Error' });
+        res.status(500).json({ msg: 'Lỗi máy chủ khi đăng ký.' });
     }
 });
 
@@ -108,10 +115,134 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.post('/api/auth/reset-password', async (req, res) => {
+    const { email, username, new_password } = req.body;
+    try {
+        const user = await db.query('SELECT * FROM users WHERE email = $1 AND username = $2', [email, username]);
+        if (user.rows.length === 0) {
+            return res.status(400).json({ msg: 'Email hoặc tên đăng nhập không chính xác.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(new_password, salt);
+
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, user.rows[0].id]);
+        res.json({ msg: 'Đặt lại mật khẩu thành công.' });
+    } catch (err) {
+        console.error("Reset Password Error:", err.message);
+        res.status(500).json({ msg: 'Lỗi máy chủ khi đặt lại mật khẩu.' });
+    }
+});
+
+app.post('/api/auth/change-password', auth, async (req, res) => {
+    const { current_password, new_password } = req.body;
+    try {
+        const user = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+        if (user.rows.length === 0) {
+            return res.status(404).json({ msg: 'Không tìm thấy người dùng.' });
+        }
+
+        const isMatch = await bcrypt.compare(current_password, user.rows[0].password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Mật khẩu hiện tại không chính xác.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(new_password, salt);
+
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, req.user.id]);
+        res.json({ msg: 'Thay đổi mật khẩu thành công.' });
+    } catch (err) {
+        console.error("Change Password Error:", err.message);
+        res.status(500).json({ msg: 'Lỗi máy chủ khi đổi mật khẩu.' });
+    }
+});
+
+app.get('/api/config', (req, res) => {
+    res.json({
+        googleClientId: process.env.GOOGLE_CLIENT_ID || ''
+    });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+    const { credential, isMock, mockData } = req.body;
+    try {
+        let email, name, avatar_url, googleId;
+
+        if (isMock) {
+            email = mockData.email || 'student@gmail.com';
+            name = mockData.name || 'Học viên Demo';
+            avatar_url = mockData.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120';
+            googleId = mockData.sub || 'mock_google_id_123456';
+        } else {
+            const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+            if (!verifyRes.ok) {
+                return res.status(400).json({ msg: 'Token Google không hợp lệ hoặc đã hết hạn.' });
+            }
+            const payload = await verifyRes.json();
+            email = payload.email;
+            name = payload.name;
+            avatar_url = payload.picture;
+            googleId = payload.sub;
+        }
+
+        const userRes = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+
+        // --- EXISTING USER: log them in directly ---
+        if (userRes.rows.length > 0) {
+            const user = userRes.rows[0];
+            // Update avatar if missing
+            if (!user.avatar_url && avatar_url) {
+                await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatar_url, user.id]);
+                user.avatar_url = avatar_url;
+            }
+            const payload = { user: { id: user.id } };
+            jwt.sign(payload, JWT_SECRET, { expiresIn: 3600 }, (err, token) => {
+                if (err) throw err;
+                res.json({
+                    token,
+                    exists: true,
+                    user: {
+                        id: user.id,
+                        username: user.username,
+                        email: user.email,
+                        is_admin: user.is_admin
+                    }
+                });
+            });
+        } else {
+            // --- NEW USER: do NOT create yet. Return Google data so
+            //     frontend can show the competency survey. The actual
+            //     account will be created by /api/register after survey. ---
+            res.json({
+                exists: false,
+                googleData: { email, name, picture: avatar_url }
+            });
+        }
+    } catch (err) {
+        console.error("Google SSO Error:", err.message);
+        res.status(500).json({ msg: 'Lỗi hệ thống khi đăng nhập Google.' });
+    }
+});
+
 app.get('/api/auth/user', auth, async (req, res) => {
     try {
-        const user = await db.query('SELECT id, username, email, full_name, level, total_points, avatar_url, survey_data, roadmap_data, is_admin FROM users WHERE id = $1', [req.user.id]);
+        const user = await db.query('SELECT id, username, email, full_name, level, total_points, avatar_url, survey_data, roadmap_data, is_admin, current_streak, longest_streak, last_activity_date FROM users WHERE id = $1', [req.user.id]);
         res.json(user.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+// Get streak info for current user
+app.get('/api/streak', auth, async (req, res) => {
+    try {
+        const result = await db.query(
+            'SELECT current_streak, longest_streak, last_activity_date FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        res.json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ msg: 'Server Error' });
@@ -169,6 +300,59 @@ app.get('/api/quiz/:id', async (req, res) => {
     }
 });
 
+// Helper: Update daily streak for a user
+async function updateStreak(user_id) {
+    const userRes = await db.query(
+        'SELECT current_streak, longest_streak, last_activity_date FROM users WHERE id = $1',
+        [user_id]
+    );
+    const user = userRes.rows[0];
+
+    // Use local date (YYYY-MM-DD) to avoid UTC offset issues
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // last_activity_date from PostgreSQL DATE column comes as a Date object or ISO string
+    // Normalize to YYYY-MM-DD string
+    let lastDateStr = null;
+    if (user.last_activity_date) {
+        const d = new Date(user.last_activity_date);
+        // PostgreSQL DATE is stored without timezone, add 12h to avoid UTC midnight rollback
+        d.setHours(d.getHours() + 12);
+        lastDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    let newStreak = user.current_streak || 0;
+
+    if (!lastDateStr) {
+        // First time activity
+        newStreak = 1;
+    } else if (lastDateStr === todayStr) {
+        // Already recorded today - do nothing
+        return { current_streak: newStreak, longest_streak: user.longest_streak || 0, streakUpdated: false };
+    } else {
+        // Calculate difference in days using date strings
+        const lastDate = new Date(lastDateStr);
+        const today = new Date(todayStr);
+        const diffDays = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+            // Consecutive day
+            newStreak += 1;
+        } else {
+            // Streak broken (missed one or more days)
+            newStreak = 1;
+        }
+    }
+
+    const newLongest = Math.max(newStreak, user.longest_streak || 0);
+    await db.query(
+        'UPDATE users SET current_streak = $1, longest_streak = $2, last_activity_date = $3 WHERE id = $4',
+        [newStreak, newLongest, todayStr, user_id]
+    );
+    return { current_streak: newStreak, longest_streak: newLongest, streakUpdated: true };
+}
+
 // 4. Submit result
 app.post('/api/results', auth, async (req, res) => {
     const { quiz_id, score, correct_count, total_count, time_spent } = req.body;
@@ -185,7 +369,10 @@ app.post('/api/results', auth, async (req, res) => {
             [pointsEarned, user_id]
         );
 
-        res.json(newResult.rows[0]);
+        // Update daily streak
+        const streakInfo = await updateStreak(user_id);
+
+        res.json({ ...newResult.rows[0], ...streakInfo });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ msg: 'Server Error' });
@@ -274,6 +461,78 @@ app.get('/api/admin/quizzes', [auth, adminAuth], async (req, res) => {
     }
 });
 
+// Admin: Dashboard Statistics
+app.get('/api/admin/dashboard-stats', [auth, adminAuth], async (req, res) => {
+    try {
+        const usersCount = await db.query('SELECT COUNT(*) as count FROM users');
+        const quizzesCount = await db.query('SELECT COUNT(*) as count FROM quizzes');
+        const resultsCount = await db.query('SELECT COUNT(*) as count FROM results');
+        const avgScore = await db.query('SELECT AVG(score) as avg FROM results');
+
+        // Attempts per day in the last 7 days
+        const attemptsDaily = await db.query(`
+            SELECT TO_CHAR(completed_at, 'YYYY-MM-DD') as date, COUNT(*) as count 
+            FROM results 
+            WHERE completed_at >= NOW() - INTERVAL '7 days' 
+            GROUP BY TO_CHAR(completed_at, 'YYYY-MM-DD') 
+            ORDER BY date ASC
+        `);
+
+        // Average score per subject
+        const scoresSubject = await db.query(`
+            SELECT s.name as subject_name, ROUND(AVG(r.score)::numeric, 2) as avg_score
+            FROM results r
+            JOIN quizzes q ON r.quiz_id = q.id
+            JOIN subjects s ON q.subject_id = s.id
+            GROUP BY s.name
+        `);
+
+        // Attempts per subject
+        const attemptsSubject = await db.query(`
+            SELECT s.name as subject_name, COUNT(*) as count
+            FROM results r
+            JOIN quizzes q ON r.quiz_id = q.id
+            JOIN subjects s ON q.subject_id = s.id
+            GROUP BY s.name
+        `);
+
+        // Score distribution
+        const scoreDist = await db.query(`
+            SELECT 
+              COUNT(CASE WHEN score < 5.0 THEN 1 END) as weak,
+              COUNT(CASE WHEN score >= 5.0 AND score < 6.5 THEN 1 END) as average,
+              COUNT(CASE WHEN score >= 6.5 AND score < 8.0 THEN 1 END) as good,
+              COUNT(CASE WHEN score >= 8.0 THEN 1 END) as excellent
+            FROM results
+        `);
+
+        // Recent attempts
+        const recentAttempts = await db.query(`
+            SELECT r.id, u.username, q.title as quiz_title, r.score, TO_CHAR(r.completed_at, 'HH24:MI DD/MM') as date
+            FROM results r
+            JOIN users u ON r.user_id = u.id
+            JOIN quizzes q ON r.quiz_id = q.id
+            ORDER BY r.completed_at DESC
+            LIMIT 5
+        `);
+
+        res.json({
+            users: parseInt(usersCount.rows[0].count || 0),
+            quizzes: parseInt(quizzesCount.rows[0].count || 0),
+            attempts: parseInt(resultsCount.rows[0].count || 0),
+            avgScore: parseFloat(avgScore.rows[0].avg || 0).toFixed(1),
+            attemptsDaily: attemptsDaily.rows,
+            scoresSubject: scoresSubject.rows,
+            attemptsSubject: attemptsSubject.rows,
+            scoreDist: scoreDist.rows[0],
+            recentAttempts: recentAttempts.rows
+        });
+    } catch (err) {
+        console.error("Dashboard Stats Error:", err);
+        res.status(500).json({ msg: 'Server Error loading dashboard stats' });
+    }
+});
+
 // Admin: Get Quiz Questions
 app.get('/api/admin/quiz/:id/questions', [auth, adminAuth], async (req, res) => {
     try {
@@ -298,13 +557,95 @@ app.put('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
     }
 });
 
+function parseQuizLocally(text) {
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    
+    // Split the document into sections starting with "Câu" or "Question"
+    const questionBlocks = normalized.split(/(?=\b(?:Câu|Question)\s*\d+)/i);
+    const questions = [];
+    
+    for (const block of questionBlocks) {
+        const trimmed = block.trim();
+        if (!trimmed) continue;
+        
+        // Match question prefix
+        const matchHeader = trimmed.match(/^(?:Câu|Question)\s*\d+\s*[:\.]?\s*([\s\S]+)/i);
+        if (!matchHeader) continue;
+        
+        const blockContent = matchHeader[1].trim();
+        
+        // Parse options A, B, C, D using word boundaries
+        const optionARegex = /\bA\s*[\.\):]\s*([\s\S]+?)(?=(?:\b[B-D]\s*[\.\):]|$))/i;
+        const optionBRegex = /\bB\s*[\.\):]\s*([\s\S]+?)(?=(?:\b[C-D]\s*[\.\):]|$))/i;
+        const optionCRegex = /\bC\s*[\.\):]\s*([\s\S]+?)(?=(?:\bD\s*[\.\):]|$))/i;
+        const optionDRegex = /\bD\s*[\.\):]\s*([\s\S]+?)(?=$)/i;
+        
+        const optA = blockContent.match(optionARegex);
+        const optB = blockContent.match(optionBRegex);
+        const optC = blockContent.match(optionCRegex);
+        const optD = blockContent.match(optionDRegex);
+        
+        if (optA && optB && optC && optD) {
+            // Content is anything before option A
+            const contentText = blockContent.split(/\bA\s*[\.\):]/i)[0].trim();
+            
+            // Try to find correct answer reference in text
+            let correctOption = "A";
+            const answerMatch = blockContent.match(/(?:Đáp án|Chọn|Hướng dẫn giải|Giải|Đáp án đúng)\s*[:\-]?\s*([A-D])/i);
+            if (answerMatch) {
+                correctOption = answerMatch[1].toUpperCase();
+            }
+            
+            // Try to find explanation reference in text
+            let explanation = "";
+            const explMatch = blockContent.match(/(?:Lời giải|Giải thích|HDG|Hướng dẫn giải|Giải)\s*[:\-]?\s*([\s\S]+)$/i);
+            if (explMatch) {
+                explanation = explMatch[1].trim();
+            }
+            
+            questions.push({
+                content: contentText,
+                option_a: optA[1].trim(),
+                option_b: optB[1].trim(),
+                option_c: optC[1].trim(),
+                option_d: optD[1].trim(),
+                correct_option: correctOption,
+                explanation: explanation || "Không có giải thích chi tiết."
+            });
+        }
+    }
+    return questions;
+}
+
+function isRecoverableAiError(err) {
+    const status = Number(err && err.status);
+    const message = [
+        err && err.message,
+        err && err.statusText,
+        err && err.name
+    ].filter(Boolean).join(' ').toLowerCase();
+    return (
+        status === 429 ||
+        status === 503 ||
+        status === 504 ||
+        message.includes('429') ||
+        message.includes('quota') ||
+        message.includes('503') ||
+        message.includes('504') ||
+        message.includes('service unavailable') ||
+        message.includes('high demand') ||
+        message.includes('temporarily unavailable') ||
+        message.includes('overloaded')
+    );
+}
+
 // 9. Admin: Scan PDF/Word
 app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded.');
     const { subject_id, grade, duration } = req.body;
+    let text = '';
     
     try {
-        let text = '';
         if (req.file.mimetype === 'application/pdf') {
             const data = await pdf(req.file.buffer);
             text = data.text;
@@ -320,12 +661,13 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
         }
 
         // Use Gemini to parse the extracted text into structured questions
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `Bạn là một chuyên gia soạn đề thi. Hãy trích xuất các câu hỏi trắc nghiệm từ văn bản sau đây.
         Yêu cầu:
         1. Trả về định dạng JSON là một mảng các đối tượng.
         2. Mỗi đối tượng gồm: "content" (câu hỏi), "option_a", "option_b", "option_c", "option_d", "correct_option" (chỉ ghi chữ cái A, B, C hoặc D), và "explanation" (giải thích ngắn gọn).
-        3. Văn bản: ${text}`;
+        3. Tất cả ngày tháng năm trong câu hỏi, đáp án và giải thích phải giữ/chuẩn hóa theo định dạng dd/mm/yyyy (ví dụ: 05/09/2026).
+        4. Văn bản: ${text}`;
 
         const result = await model.generateContent(prompt);
         const aiText = result.response.text();
@@ -340,6 +682,20 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
         } catch (e) {
             const cleaned = jsonMatch[0].replace(/```json/g, '').replace(/```/g, '').trim();
             questions = JSON.parse(cleaned);
+        }
+
+        const isPreview = (req.body.preview === 'true' || req.query.preview === 'true');
+        if (isPreview) {
+            const cleanedFilename = req.file.originalname.replace(/\.[^/.]+$/, "");
+            return res.json({
+                msg: 'Quiz parsed successfully',
+                preview: true,
+                title: `Đề Scan: ${cleanedFilename}`,
+                subject_id: parseInt(subject_id),
+                grade: parseInt(grade),
+                duration: parseInt(duration || 15),
+                questions: questions
+            });
         }
 
         const client = await db.pool.connect();
@@ -368,6 +724,82 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
             client.release();
         }
     } catch (err) {
+        if (isRecoverableAiError(err) && req.file) {
+            console.warn("AI scan temporarily unavailable. Falling back to local/mock scan quiz:", err.message);
+            const cleanedFilename = req.file.originalname.replace(/\.[^/.]+$/, "");
+            const locallyParsedQuestions = text ? parseQuizLocally(text) : [];
+            const usingLocalParse = locallyParsedQuestions.length > 0;
+            const questions = usingLocalParse ? locallyParsedQuestions : [
+                {
+                    content: `Câu hỏi mẫu trích xuất từ tài liệu quét (Dữ liệu Mock do hết hạn ngạch API $y = ax^2 + bx + c$)`,
+                    option_a: "Đáp án A liên quan đến nội dung tài liệu",
+                    option_b: "Đáp án B",
+                    option_c: "Đáp án C",
+                    option_d: "Đáp án D",
+                    correct_option: "A",
+                    explanation: `Giải thích chi tiết cho câu hỏi mẫu trích xuất từ tài liệu quét: ${cleanedFilename}.`
+                },
+                {
+                    content: `Câu hỏi mẫu 2 từ tài liệu quét (Dữ liệu Mock $f'(x) = \\lim_{\\Delta x \\to 0} \\frac{f(x+\\Delta x) - f(x)}{\\Delta x}$)`,
+                    option_a: "Đáp án A",
+                    option_b: "Đáp án B liên quan",
+                    option_c: "Đáp án C",
+                    option_d: "Đáp án D",
+                    correct_option: "B",
+                    explanation: "Giải thích chi tiết cho câu hỏi 2."
+                }
+            ];
+
+            const isPreview = (req.body.preview === 'true' || req.query.preview === 'true');
+            if (isPreview) {
+                return res.json({
+                    msg: usingLocalParse ? 'Quiz parsed successfully (LOCAL - AI unavailable)' : 'Quiz parsed successfully (MOCK - AI unavailable)',
+                    preview: true,
+                    title: `Đề Scan: ${cleanedFilename} (Dữ liệu thử nghiệm - Quota Exceeded)`,
+                    title: usingLocalParse ? `Đề Scan: ${cleanedFilename}` : `Đề Scan: ${cleanedFilename} (AI unavailable)`,
+                    subject_id: parseInt(subject_id),
+                    grade: parseInt(grade),
+                    duration: parseInt(duration || 15),
+                    questions: questions,
+                    is_mock: !usingLocalParse,
+                    is_local_parse: usingLocalParse
+                });
+            }
+
+            const client = await db.pool.connect();
+            try {
+                await client.query('BEGIN');
+                const newQuiz = await client.query(
+                    'INSERT INTO quizzes (title, subject_id, grade, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [`Đề Scan: ${req.file.originalname} (Mock)`, subject_id, grade, duration || 15]
+                );
+                const quizId = newQuiz.rows[0].id;
+                if (usingLocalParse) {
+                    const localTitle = `Đề Scan: ${req.file.originalname}`;
+                    await client.query('UPDATE quizzes SET title = $1 WHERE id = $2', [localTitle, quizId]);
+                    newQuiz.rows[0].title = localTitle;
+                }
+                for (const q of questions) {
+                    await client.query(
+                        'INSERT INTO questions (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                        [quizId, q.content, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation]
+                    );
+                }
+                await client.query('COMMIT');
+                return res.json({
+                    msg: usingLocalParse ? 'Quiz scanned and created (LOCAL - AI unavailable)' : 'Quiz scanned and created (MOCK - AI unavailable)',
+                    quiz: newQuiz.rows[0],
+                    is_mock: !usingLocalParse,
+                    is_local_parse: usingLocalParse
+                });
+            } catch (dbErr) {
+                await client.query('ROLLBACK');
+                console.error("DB Error in Mock Fallback:", dbErr);
+                return res.status(500).json({ msg: 'Scanning Failed: ' + err.message });
+            } finally {
+                client.release();
+            }
+        }
         console.error("Scanning Error:", err);
         res.status(500).json({ msg: 'Scanning Failed: ' + err.message });
     }
@@ -401,8 +833,8 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
     const { subject_id, grade, count, subject_name } = req.body;
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-        // Improve prompt for JSON reliability
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        // Improve prompt for JSON reliability and LaTeX formatting
         const prompt = `
             Bạn là một chuyên gia biên soạn đề thi trắc nghiệm theo chuẩn của Bộ Giáo dục và Đào tạo Việt Nam.
             Hãy tạo một bộ đề thi trắc nghiệm môn ${subject_name} lớp ${grade}.
@@ -413,6 +845,8 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
             - Mỗi câu hỏi phải có 4 phương án lựa chọn (A, B, C, D).
             - Chỉ có duy nhất 1 đáp án đúng.
             - Phải có phần giải thích ngắn gọn cho đáp án đúng.
+            - Tất cả ngày tháng năm trong câu hỏi, đáp án và giải thích phải có định dạng dd/mm/yyyy (ví dụ: 05/09/2026).
+            - QUAN TRỌNG: Tất cả các công thức toán học, vật lý, hóa học, ký hiệu khoa học (như số pi, alpha, beta, tích phân, đạo hàm, phân số, số mũ, phương trình...) ở câu hỏi, các lựa chọn đáp án và phần giải thích BẮT BUỘC phải đặt trong cặp dấu đô-la single '$' cho công thức nội dòng (ví dụ: $y = x^2$, $H_2SO_4$, $\\alpha$) hoặc double '$$' cho khối công thức riêng biệt.
             
             Định dạng đầu ra: CHỈ TRẢ VỀ JSON MẢNG (không có văn bản giải thích ở đầu hoặc cuối). 
             BẮT BUỘC ĐÚNG ĐỊNH DẠNG JSON. Không sử dụng ký tự đặc biệt gây lỗi JSON.
@@ -450,6 +884,19 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
         
         const questions = JSON.parse(cleanedJson);
 
+        const isPreview = (req.body.preview === true || req.body.preview === 'true' || req.query.preview === 'true');
+        if (isPreview) {
+            return res.json({
+                msg: 'Quiz generated successfully',
+                preview: true,
+                title: `Đề ${subject_name} Lớp ${grade} (AI biên soạn)`,
+                subject_id: parseInt(subject_id),
+                grade: parseInt(grade),
+                duration: count == 40 ? 50 : 30,
+                questions: questions
+            });
+        }
+
         const client = await db.pool.connect();
         try {
             await client.query('BEGIN');
@@ -476,6 +923,63 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
         }
     } catch (err) {
         console.error("AI Gen Error:", err);
+        const isQuotaError = err.message && (err.message.includes("429") || err.message.includes("quota") || err.message.includes("Quota"));
+        if (isQuotaError) {
+            console.log("Quota exceeded. Falling back to Mock quiz generation...");
+            const questions = [];
+            const num = parseInt(count) || 10;
+            for (let i = 1; i <= num; i++) {
+                questions.push({
+                    content: `Câu hỏi mẫu số ${i} môn ${subject_name} Lớp ${grade} (Tự động tạo do hết hạn ngạch API $y = f(x)$)`,
+                    option_a: `Đáp án A của câu hỏi ${i}`,
+                    option_b: `Đáp án B của câu hỏi ${i}`,
+                    option_c: `Đáp án C của câu hỏi ${i}`,
+                    option_d: `Đáp án D của câu hỏi ${i}`,
+                    correct_option: ["A", "B", "C", "D"][Math.floor(Math.random() * 4)],
+                    explanation: `Giải thích chi tiết cho đáp án đúng của câu hỏi số ${i} môn ${subject_name} lớp ${grade}.`
+                });
+            }
+
+            const isPreview = (req.body.preview === true || req.body.preview === 'true' || req.query.preview === 'true');
+            if (isPreview) {
+                return res.json({
+                    msg: 'Quiz generated successfully (MOCK - Quota Exceeded)',
+                    preview: true,
+                    title: `Đề ${subject_name} Lớp ${grade} (Dữ liệu thử nghiệm - Quota Exceeded)`,
+                    subject_id: parseInt(subject_id),
+                    grade: parseInt(grade),
+                    duration: count == 40 ? 50 : 30,
+                    questions: questions,
+                    is_mock: true
+                });
+            }
+
+            const client = await db.pool.connect();
+            try {
+                await client.query('BEGIN');
+                const quizTitle = `Đề ${subject_name} Lớp ${grade} (Dữ liệu thử nghiệm - Quota Exceeded)`;
+                const newQuiz = await client.query(
+                    'INSERT INTO quizzes (title, subject_id, grade, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [quizTitle, subject_id, grade, count == 40 ? 50 : 30]
+                );
+                const quizId = newQuiz.rows[0].id;
+
+                for (const q of questions) {
+                    await client.query(
+                        'INSERT INTO questions (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                        [quizId, q.content, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation]
+                    );
+                }
+                await client.query('COMMIT');
+                return res.json({ msg: 'Quiz generated successfully (MOCK)', quiz_id: quizId, is_mock: true });
+            } catch (dbErr) {
+                await client.query('ROLLBACK');
+                console.error("DB Error in Mock Fallback:", dbErr);
+                return res.status(500).json({ msg: 'Failed to generate quiz: ' + err.message });
+            } finally {
+                client.release();
+            }
+        }
         res.status(500).json({ msg: 'Failed to generate quiz with AI: ' + err.message });
     }
 });
@@ -536,7 +1040,7 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
             }
         });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `
         Bạn là một cố vấn học tập AI thông minh. Hãy phân tích kết quả bài thi sau và đưa ra lộ trình học tập.
         
@@ -555,10 +1059,11 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
         3. Đề xuất một LỘ TRÌNH HỌC TẬP CÁ NHÂN HÓA trong 4 tuần để cải thiện (chia rõ từng tuần cần học gì, làm gì).
         4. Đưa ra 3 lời khuyên cụ thể để học tốt môn ${quiz.subject_name} hơn.
         
-        TRÌNH BÀY:
+        TRÌNH BÀY & ĐỊNH DẠNG:
         - Sử dụng ngôn ngữ tiếng Việt thân thiện, khích lệ.
         - Trình bày dưới dạng Markdown đẹp mắt, có tiêu đề, danh sách, in đậm.
         - Không cần phần giới thiệu rườm rà, đi thẳng vào phân tích.
+        - QUAN TRỌNG: Tất cả các công thức toán học, ký hiệu khoa học (như số pi, alpha, beta, tích phân, đạo hàm, phân số, số mũ, phương trình...) BẮT BUỘC phải đặt trong cặp dấu đô-la single '$' cho công thức nội dòng (ví dụ: $y = x^2$) hoặc double '$$' cho khối công thức riêng biệt (ví dụ: $$\\int x \\, dx$$).
         `;
 
         const result = await model.generateContent(prompt);
@@ -572,11 +1077,58 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
         res.json({ analysis: analysisText });
     } catch (err) {
         console.error("AI Analysis Detailed Error:", err);
+        const isQuotaError = err.message && (err.message.includes("429") || err.message.includes("quota") || err.message.includes("Quota"));
+        if (isQuotaError) {
+             console.log("Quota exceeded. Falling back to Mock analysis...");
+             return res.json({ analysis: "### Phân tích kết quả học tập (Dữ liệu thử nghiệm - Hết hạn ngạch API)\n\n* **Nhận xét tổng quan**: Bạn đã hoàn thành bài thi với sự nỗ lực rất đáng khen ngợi. Mặc dù còn một số câu trả lời chưa chính xác, đây chính là cơ hội tốt để ôn tập lại kiến thức.\n* **Kiến thức cần lưu ý**: Hãy tập trung ôn tập kỹ lý thuyết của các câu hỏi đã làm sai trong bài kiểm tra.\n* **Lộ trình học tập cá nhân hóa**: \n  * **Tuần 1**: Hệ thống lại toàn bộ lý thuyết liên quan đến các dạng câu hỏi bị sai.\n  * **Tuần 2**: Làm lại các bài trắc nghiệm tương tự.\n  * **Tuần 3 & 4**: Nâng cao kỹ năng làm bài thi thông qua giải đề mẫu.\n* **3 Lời khuyên học tốt**: \n  1. Đọc kỹ đề bài trước khi chọn đáp án.\n  2. Ghi chú các công thức quan trọng vào sổ tay học tập.\n  3. Đều đặn ôn tập mỗi ngày để ghi nhớ lâu hơn." });
+        }
         res.status(500).json({ 
             msg: 'AI Analysis Failed', 
             error: err.message,
             stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
+    }
+});
+
+// AI Chat Tutor per Subject
+app.post('/api/chat', auth, async (req, res) => {
+    const { subject_name, message, history } = req.body;
+    if (!message) return res.status(400).json({ msg: 'Tin nhắn không được để trống.' });
+
+    try {
+        const systemText = `Bạn là một Gia sư AI chuyên nghiệp, tận tâm và giàu kinh nghiệm tại Việt Nam.
+Nhiệm vụ của bạn là hỗ trợ học sinh học tập và giải đáp mọi thắc mắc liên quan đến môn học: ${subject_name || 'Học tập'}.
+Hãy tuân thủ các quy tắc sau:
+1. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn, súc tích, đi thẳng vào câu hỏi, tránh giải thích dài dòng hoặc lan man.
+2. Trình bày lời giải chi tiết, từng bước một nếu là bài toán/bài tập, nhưng giữ các bước giải rõ ràng, ngắn gọn và dễ hiểu nhất.
+3. Sử dụng định dạng Markdown (tiêu đề, danh sách, in đậm, khối mã) để câu trả lời đẹp mắt, dễ theo dõi.
+4. QUAN TRỌNG: Tất cả các công thức toán học, ký hiệu khoa học (như số pi, alpha, beta, tích phân, đạo hàm, phân số, số mũ, phương trình...) BẮT BUỘC phải đặt trong cặp dấu đô-la single '$' cho công thức nội dòng (ví dụ: $y = x^3$) hoặc double '$$' cho khối công thức riêng biệt (ví dụ: $$\\int x^2 \\, dx$$). Không được ghi ký hiệu thô không định dạng.
+5. Tránh trả lời các câu hỏi không liên quan đến học tập hoặc các chủ đề bạo lực, nhạy cảm.
+6. Nếu câu hỏi không rõ ràng, hãy lịch sự hỏi lại hoặc đưa ra các trường hợp giả định để giải thích.
+7. Xưng hô với người dùng là "Bạn" và gọi bản thân là "Mình" (xưng hô Bạn - Mình). Tuyệt đối không xưng hô Thầy/Cô - Em hoặc các đại từ xưng hô khác.`;
+
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: { parts: [{ text: systemText }] }
+        });
+
+        const chat = model.startChat({
+            history: history || []
+        });
+
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        const text = response.text();
+
+        res.json({ reply: text });
+    } catch (err) {
+        console.error("AI Chat Error:", err);
+        const isQuotaError = err.message && (err.message.includes("429") || err.message.includes("quota") || err.message.includes("Quota"));
+        if (isQuotaError) {
+             console.log("Quota exceeded. Falling back to Mock chat reply...");
+             return res.json({ reply: "Xin chào! Hiện tại hệ thống AI Gia sư của mình đang tạm thời hết hạn ngạch truy cập (Quota 429). Bạn có thể thử lại sau ít phút hoặc liên hệ với quản trị viên nhé! Rất xin lỗi vì sự bất tiện này." });
+        }
+        res.status(500).json({ msg: 'Gặp lỗi khi kết nối với AI Gia sư.', error: err.message });
     }
 });
 
@@ -600,7 +1152,7 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
         const results = resultsRes.rows;
 
         // 2. Prepare AI Prompt
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const prompt = `
             Bạn là một chuyên gia giáo dục cao cấp. Hãy xây dựng một LỘ TRÌNH HỌC TẬP CÁ NHÂN HÓA trong 4 tuần cho học sinh dựa trên thông tin sau:
             
@@ -620,6 +1172,7 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
             3. Lời khuyên dựa trên "Thế mạnh" và "Điểm yếu" đã khai báo.
             4. Phong cách trình bày: Chuyên nghiệp, khích lệ, sử dụng Markdown (Tiêu đề, danh sách, in đậm).
             5. Ngôn ngữ: Tiếng Việt.
+            6. QUAN TRỌNG: Tất cả các công thức toán học, ký hiệu khoa học (như số pi, alpha, beta, tích phân, đạo hàm, phân số, số mũ, phương trình...) BẮT BUỘC phải đặt trong cặp dấu đô-la single '$' cho công thức nội dòng (ví dụ: $y = x^2$) hoặc double '$$' cho khối công thức riêng biệt (ví dụ: $$\\int x \\, dx$$).
             
             Không cần lời chào hỏi dài dòng, đi thẳng vào nội dung lộ trình.
         `;
@@ -634,10 +1187,25 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
         res.json({ msg: 'Roadmap generated', roadmap: roadmapText });
     } catch (err) {
         console.error("Roadmap Gen Error:", err);
+        const isQuotaError = err.message && (err.message.includes("429") || err.message.includes("quota") || err.message.includes("Quota"));
+        if (isQuotaError) {
+             console.log("Quota exceeded. Falling back to Mock roadmap...");
+             const roadmapText = "### Lộ trình học tập cá nhân hóa 4 tuần (Dữ liệu thử nghiệm - Hết hạn ngạch API)\n\n* **Tuần 1: Ôn tập cốt lõi**\n  * Trọng tâm: Tập trung nắm vững lại các khái niệm cơ bản dựa trên kết quả khảo sát của bạn.\n  * Bài tập: Hoàn thành 2 bài kiểm tra trắc nghiệm cơ bản.\n* **Tuần 2: Nâng cao kỹ năng**\n  * Trọng tâm: Ôn luyện chuyên sâu các phần kiến thức còn yếu.\n  * Bài tập: Giải các bài tập tự luyện và ghi chú lại các lỗi thường gặp.\n* **Tuần 3: Luyện đề tổng hợp**\n  * Trọng tâm: Bắt đầu làm quen với các đề thi có thời gian làm bài thực tế.\n* **Tuần 4: Đánh giá & Điều chỉnh**\n  * Trọng tâm: Kiểm tra lại các lỗ hổng kiến thức cuối cùng để sẵn sàng cho bài thi chính thức.";
+             try {
+                 await db.query('UPDATE users SET roadmap_data = $1 WHERE id = $2', [roadmapText, req.user.id]);
+             } catch (dbErr) {
+                 console.error("DB Error in Mock Roadmap Fallback:", dbErr);
+             }
+             return res.json({ msg: 'Roadmap generated (MOCK)', roadmap: roadmapText, is_mock: true });
+        }
         res.status(500).json({ msg: 'Failed to generate roadmap', error: err.message });
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+module.exports = app;
+
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}

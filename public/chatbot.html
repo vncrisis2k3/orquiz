@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gia Sư Hỏi Đáp - Edu-Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        .chat-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: calc(100vh - 85px);
+            background: #F8FAFC;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .chat-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .chat-sidebar {
+                display: none;
+            }
+        }
+
+        .chat-sidebar {
+            background: white;
+            border-right: 1px solid #E2E8F0;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .chat-main {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .subject-selector-card {
+            background: var(--bg-orange);
+            border: 1px solid rgba(255, 138, 0, 0.15);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .subject-selector-card h4 {
+            color: var(--secondary);
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .subject-dropdown {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 2px solid #E2E8F0;
+            font-family: inherit;
+            font-weight: 600;
+            color: var(--secondary);
+            background: white;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .subject-dropdown:focus {
+            border-color: var(--primary);
+        }
+
+        .suggestions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .suggestion-btn {
+            background: white;
+            border: 1px solid #E2E8F0;
+            padding: 12px 16px;
+            border-radius: 14px;
+            text-align: left;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            line-height: 1.4;
+        }
+
+        .suggestion-btn:hover {
+            border-color: var(--primary-light);
+            background: var(--bg-light);
+            color: var(--primary);
+            transform: translateX(5px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message-wrapper {
+            display: flex;
+            gap: 15px;
+            max-width: 80%;
+        }
+
+        .message-wrapper.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-wrapper.bot {
+            align-self: flex-start;
+        }
+
+        .message-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .message-wrapper.user .message-avatar {
+            background: var(--primary);
+            color: white;
+        }
+
+        .message-wrapper.bot .message-avatar {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .message-bubble {
+            padding: 16px 20px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        }
+
+        .message-wrapper.user .message-bubble {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-top-right-radius: 4px;
+        }
+
+        .message-wrapper.bot .message-bubble {
+            background: white;
+            color: var(--text-dark);
+            border-top-left-radius: 4px;
+            border: 1px solid #F1F5F9;
+        }
+
+        .chat-input-area {
+            background: white;
+            padding: 20px 30px;
+            border-top: 1px solid #E2E8F0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 16px 24px;
+            border-radius: 16px;
+            border: 2px solid #E2E8F0;
+            outline: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary);
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 16px 28px;
+            border-radius: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 138, 0, 0.25);
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 138, 0, 0.4);
+        }
+
+        .send-btn:disabled {
+            background: #cbd5e1;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message-bubble h1,
+        .message-bubble h2,
+        .message-bubble h3 {
+            font-size: 1.15rem;
+            margin-top: 12px;
+            margin-bottom: 8px;
+            color: inherit;
+        }
+
+        .message-bubble ul,
+        .message-bubble ol {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .message-bubble li {
+            margin-bottom: 5px;
+        }
+
+        .message-bubble strong {
+            font-weight: 700;
+        }
+
+        .message-bubble code {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .message-wrapper.user .message-bubble code {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            padding: 8px 10px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-gray);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body style="overflow: hidden;">
+    <nav class="navbar"
+        style="background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); border-bottom: 1px solid #F1F5F9; position: relative; z-index: 10;">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html#subjects">Kiểm tra</a></li>
+                <li><a href="practice.html">Luyện tập</a></li>
+                <li><a href="roadmap.html">Lộ trình</a></li>
+                <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
+                <li><a href="profile.html" class="btn btn-outline" style="border-radius: 15px;">Trang cá nhân</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="chat-layout">
+        <aside class="chat-sidebar">
+            <div class="subject-selector-card">
+                <h4>📚 Chọn môn học hỏi đáp</h4>
+                <select id="subject-select" class="subject-dropdown" onchange="onSubjectChange()">
+                </select>
+            </div>
+
+            <div>
+                <h4 style="color: var(--secondary); font-size: 0.9rem; margin-bottom: 12px; font-weight: 700;">💡 Gợi ý
+                    câu hỏi</h4>
+                <div class="suggestions-container" id="suggestions-box">
+                </div>
+            </div>
+        </aside>
+
+        <main class="chat-main">
+            <div class="chat-messages" id="chat-messages-container">
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" id="chat-user-input" class="chat-input" placeholder="Nhập câu hỏi của bạn tại đây..."
+                    onkeypress="handleKeyPress(event)">
+                <button id="chat-send-btn" class="send-btn" onclick="sendMessage()">Gửi đi</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+
+        let chatHistory = [];
+        let chatHistories = {}; // Lưu lịch sử chat theo từng môn học
+        let chatStorageKey = 'chatHistories_default';
+        let currentSubjectName = '';
+        let currentSubjectId = null;
+        let subjectsList = [];
+
+        const defaultSuggestions = {
+            'Toán Học': [
+                'Giải thích công thức tính đạo hàm của hàm hợp.',
+                'Làm sao để tìm cực trị của hàm số bậc ba?',
+                'Cho em một ví dụ về tích phân từng phần.'
+            ],
+            'Vật Lý': [
+                'Hãy tóm tắt các công thức chương Dao động cơ.',
+                'Định luật khúc xạ ánh sáng phát biểu thế nào?',
+                'Thế nào là hiện tượng quang điện ngoài?'
+            ],
+            'Hóa Học': [
+                'Làm sao để nhận biết các ion trong dung dịch?',
+                'Viết sơ đồ phản ứng chuỗi este hóa.',
+                'Giải thích thuyết lai hóa obitan nguyên tử.'
+            ],
+            'Sinh Học': [
+                'Quy luật phân ly độc lập của Menđen phát biểu thế nào?',
+                'Sự khác nhau giữa ADN và ARN là gì?',
+                'Cơ chế nhân đôi ADN diễn ra như thế nào?'
+            ],
+            'Tiếng Anh': [
+                'Giải thích cấu trúc câu điều kiện loại 3.',
+                'Sự khác nhau giữa Present Perfect và Past Simple là gì?',
+                'Cho em một số mẹo làm bài đọc hiểu Tiếng Anh.'
+            ]
+        };
+
+        const genericSuggestions = [
+            'Giải thích khái niệm cơ bản môn này.',
+            'Cho em một bài tập mẫu kèm lời giải.',
+            'Cách ôn thi môn này hiệu quả cao.'
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            // Load histories for this user
+            const userStr = localStorage.getItem('user');
+            let userId = 'default';
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user && user.id) userId = user.id;
+                } catch (e) {}
+            }
+            chatStorageKey = `chatHistories_${userId}`;
+            try {
+                chatHistories = JSON.parse(localStorage.getItem(chatStorageKey) || '{}');
+            } catch (e) {
+                console.error('Lỗi load chatHistories:', e);
+            }
+
+            await loadSubjects();
+
+            // Read URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const subId = urlParams.get('subject');
+            const subName = urlParams.get('name');
+
+            if (subId && subName) {
+                currentSubjectId = String(subId);
+                currentSubjectName = decodeURIComponent(subName);
+                document.getElementById('subject-select').value = subId;
+            } else if (subjectsList.length > 0) {
+                currentSubjectId = String(subjectsList[0].id);
+                currentSubjectName = subjectsList[0].name;
+            }
+
+            onSubjectChange(); // Initialize chat interface
+        });
+
+        async function loadSubjects() {
+            try {
+                const res = await fetch(`${API_URL}/subjects`);
+                if (res.ok) {
+                    subjectsList = await res.json();
+                    const select = document.getElementById('subject-select');
+                    select.innerHTML = subjectsList.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function saveCurrentChat() {
+            if (currentSubjectId) {
+                chatHistories[currentSubjectId] = {
+                    history: chatHistory,
+                    html: document.getElementById('chat-messages-container').innerHTML
+                };
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistories));
+            }
+        }
+
+        function onSubjectChange() {
+            const select = document.getElementById('subject-select');
+            const newSubjectId = String(select.value);
+
+            // Lưu lịch sử chat của môn học cũ trước khi chuyển môn
+            if (currentSubjectId && String(currentSubjectId) !== newSubjectId) {
+                chatHistories[currentSubjectId] = {
+                    history: chatHistory,
+                    html: document.getElementById('chat-messages-container').innerHTML
+                };
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistories));
+            }
+
+            currentSubjectId = newSubjectId;
+            currentSubjectName = select.options[select.selectedIndex].text;
+
+            const container = document.getElementById('chat-messages-container');
+
+            // Khôi phục lịch sử nếu đã có, hoặc tạo mới nếu chưa có
+            if (chatHistories[currentSubjectId]) {
+                chatHistory = chatHistories[currentSubjectId].history;
+                container.innerHTML = chatHistories[currentSubjectId].html;
+            } else {
+                chatHistory = [];
+                container.innerHTML = '';
+                // Render tin nhắn chào mừng
+                appendBotMessage(`Xin chào! Mình là Gia sư AI môn **${currentSubjectName}**. Bạn có câu hỏi nào cần giải đáp hoặc bài tập nào cần hướng dẫn hôm nay không?`);
+                saveCurrentChat();
+            }
+
+            // Cập nhật gợi ý câu hỏi
+            const suggestionsBox = document.getElementById('suggestions-box');
+            let suggestions = defaultSuggestions[currentSubjectName] || defaultSuggestions[currentSubjectName.replace(' Học', '')] || genericSuggestions;
+
+            suggestionsBox.innerHTML = suggestions.map(s => `
+                <button class="suggestion-btn" onclick="useSuggestion('${s}')">${s}</button>
+            `).join('');
+
+            scrollChat(true);
+        }
+
+        function useSuggestion(text) {
+            document.getElementById('chat-user-input').value = text;
+            sendMessage();
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            appendUserMessage(text);
+
+            const typingId = appendTypingIndicator();
+
+            try {
+                const formattedHistory = [];
+                const lastHistory = chatHistory.slice(-8);
+                lastHistory.forEach(msg => {
+                    formattedHistory.push({
+                        role: msg.isUser ? 'user' : 'model',
+                        parts: [{ text: msg.text }]
+                    });
+                });
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': token
+                    },
+                    body: JSON.stringify({
+                        subject_name: currentSubjectName,
+                        message: text,
+                        history: formattedHistory
+                    })
+                });
+
+                document.getElementById(typingId).remove();
+
+                if (res.ok) {
+                    const data = await res.json();
+                    appendBotMessage(data.reply);
+                    chatHistory.push({ isUser: true, text: text });
+                    chatHistory.push({ isUser: false, text: data.reply });
+                    saveCurrentChat();
+                } else {
+                    const errData = await res.json();
+                    appendBotMessage(`❌ Lỗi: ${errData.msg || 'Không thể lấy phản hồi từ Gia sư.'}`);
+                }
+            } catch (err) {
+                if (document.getElementById(typingId)) {
+                    document.getElementById(typingId).remove();
+                }
+                appendBotMessage('❌ Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng.');
+            }
+        }
+
+        function appendUserMessage(text) {
+            const container = document.getElementById('chat-messages-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper user';
+
+            wrapper.innerHTML = `
+                <div class="message-avatar">U</div>
+                <div class="message-bubble">${escapeHtml(text)}</div>
+            `;
+            container.appendChild(wrapper);
+
+            renderMathInChatBubble(wrapper.querySelector('.message-bubble'));
+            scrollChat(true);
+        }
+
+        function appendBotMessage(markdownText) {
+            const container = document.getElementById('chat-messages-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper bot';
+
+            let cleanText = escapeHtml(markdownText);
+            let renderedHtml = renderMarkdownWithMathProtection(cleanText);
+
+            wrapper.innerHTML = `
+                <div class="message-avatar">AI</div>
+                <div class="message-bubble">${renderedHtml}</div>
+            `;
+            container.appendChild(wrapper);
+
+            renderMathInChatBubble(wrapper.querySelector('.message-bubble'));
+            scrollChat(false);
+        }
+
+        function appendTypingIndicator() {
+            const id = 'typing-' + Date.now();
+            const container = document.getElementById('chat-messages-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper bot';
+            wrapper.id = id;
+            wrapper.innerHTML = `
+                <div class="message-avatar">AI</div>
+                <div class="message-bubble">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(wrapper);
+            scrollChat(false);
+            return id;
+        }
+
+        function scrollChat(force = false) {
+            const container = document.getElementById('chat-messages-container');
+            // Check if user is near the bottom (within 150px)
+            const isNearBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 150;
+            if (force || isNearBottom) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function renderMarkdownWithMathProtection(text) {
+            if (!text) return '';
+
+            const mathBlocks = [];
+            // Bóc tách cô lập toàn bộ cấu trúc chứa ký tự toán học $ và $$
+            let placeholderText = text.replace(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$)/g, (match) => {
+                mathBlocks.push(match);
+                return `___MATH_BLOCK_${mathBlocks.length - 1}___`;
+            });
+
+            // Xử lý các tag Markdown thông thường mà không phá hỏng mã toán
+            let html = placeholderText
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                .replace(/^\* (.*$)/gim, '<li>$1</li>')
+                .replace(/^- (.*$)/gim, '<li>$1</li>')
+                .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                .replace(/`([^`]+)`/gim, '<code>$1</code>')
+                .replace(/\n/gim, '<br>');
+
+            html = html.replace(/<li>(.*?)<\/li>/gs, (match) => `<ul>${match}</ul>`);
+            html = html.replace(/<\/ul><br><ul>/gim, '');
+            html = html.replace(/<\/ul><ul>/gim, '');
+
+            // Trả mã toán học trở lại vị trí cũ sau khi HTML đã sạch
+            html = html.replace(/___MATH_BLOCK_(\d+)___/g, (match, index) => {
+                return mathBlocks[parseInt(index)]
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#039;/g, "'");
+            });
+
+            return html;
+        }
+
+        function renderMathInChatBubble(element) {
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    throwOnError: false,
+                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>

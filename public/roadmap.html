@@ -8,6 +8,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- KaTeX CDN for mathematical/scientific rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });"></script>
     <style>
         .roadmap-container { padding: 60px 0; }
         .roadmap-header { 
@@ -155,8 +159,9 @@
             if (user) {
                 navLinks.innerHTML = `
                     <li><a href="index.html#subjects">Kiểm tra</a></li>
+                    <li><a href="practice.html">Luyện tập</a></li>
                     <li><a href="roadmap.html">Lộ trình</a></li>
-                    <li><a href="index.html#ranking">Bảng xếp hạng</a></li>
+                    <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
                     <li><a href="profile.html" class="btn btn-outline">Trang cá nhân</a></li>
                     <li><a href="#" onclick="logout()" class="btn btn-primary">Đăng xuất</a></li>
                 `;
@@ -189,7 +194,19 @@
                 if (user.roadmap_data) {
                     document.getElementById('roadmap-empty').style.display = 'none';
                     document.getElementById('roadmap-view').style.display = 'grid';
-                    document.getElementById('roadmap-html-content').innerHTML = marked.parse(user.roadmap_data);
+                    const targetEl = document.getElementById('roadmap-html-content');
+                    targetEl.innerHTML = marked.parse(user.roadmap_data);
+                    if (typeof renderMathInElement === 'function') {
+                        renderMathInElement(targetEl, {
+                            delimiters: [
+                                {left: "$$", right: "$$", display: true},
+                                {left: "$", right: "$", display: false},
+                                {left: "\\(", right: "\\)", display: false},
+                                {left: "\\[", right: "\\]", display: true}
+                            ],
+                            throwOnError: false
+                        });
+                    }
                 }
             } catch (err) { console.error(err); }
         }

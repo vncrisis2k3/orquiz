@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --primary: #FF8A00;
@@ -202,6 +203,102 @@
         .auth-container {
             max-width: 500px; /* Slightly wider for survey */
         }
+
+        /* Google Mock Modal */
+        .google-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .google-modal-overlay.active {
+            display: flex;
+        }
+        .google-modal {
+            background: white;
+            border-radius: 28px;
+            padding: 36px 32px;
+            width: 100%;
+            max-width: 400px;
+            margin: 20px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+            animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.85) translateY(20px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .google-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .google-modal-header svg { flex-shrink: 0; }
+        .google-modal-header h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin: 0;
+        }
+        .google-modal-header p {
+            font-size: 0.8rem;
+            color: #64748B;
+            margin: 2px 0 0;
+        }
+        .google-modal input {
+            width: 100%;
+            padding: 13px 16px;
+            border: 2px solid #E2E8F0;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            margin-bottom: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .google-modal input:focus {
+            outline: none;
+            border-color: #4285F4;
+            box-shadow: 0 0 0 3px rgba(66,133,244,0.12);
+        }
+        .google-modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .google-modal-actions button {
+            flex: 1;
+            padding: 13px;
+            border-radius: 14px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-google-cancel {
+            background: #F1F5F9;
+            color: #64748B;
+        }
+        .btn-google-cancel:hover { background: #E2E8F0; }
+        .btn-google-confirm {
+            background: #4285F4;
+            color: white;
+        }
+        .btn-google-confirm:hover { background: #3367D6; transform: translateY(-1px); }
+        .google-modal label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 6px;
+        }
     </style>
 </head>
 <body class="auth-page">
@@ -223,7 +320,38 @@
                 <label>Mật khẩu</label>
                 <input type="password" id="login-password" placeholder="••••••••" required>
             </div>
+            <div class="form-group" style="text-align: right; margin-top: -10px; margin-bottom: 15px;">
+                <a href="#" id="link-forgot" style="color: var(--primary); font-size: 0.9rem; text-decoration: none; font-weight: 500;">Quên mật khẩu?</a>
+            </div>
             <button type="submit" class="btn btn-primary auth-btn">Đăng nhập</button>
+        </form>
+
+        <!-- Forgot Password Form -->
+        <form id="forgot-form" class="auth-form" style="display: none;">
+            <p class="step-title" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 5px; color: var(--secondary);">Đặt lại mật khẩu</p>
+            <p class="step-desc" style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px;">Nhập thông tin xác thực để thiết lập mật khẩu mới.</p>
+            
+            <div class="form-group">
+                <label>Email đăng ký</label>
+                <input type="email" id="forgot-email" placeholder="email@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>Tên đăng nhập</label>
+                <input type="text" id="forgot-username" placeholder="nguyenvana" required>
+            </div>
+            <div class="form-group">
+                <label>Mật khẩu mới</label>
+                <input type="password" id="forgot-password" placeholder="••••••••" required>
+            </div>
+            <div class="form-group">
+                <label>Xác nhận mật khẩu mới</label>
+                <input type="password" id="forgot-confirm-password" placeholder="••••••••" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary auth-btn">Xác nhận đặt lại mật khẩu</button>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="#" id="back-to-login" style="color: var(--text-gray); font-size: 0.9rem; text-decoration: none; font-weight: 500;">← Quay lại đăng nhập</a>
+            </div>
         </form>
 
         <!-- Register Form -->
@@ -423,6 +551,52 @@
             </div>
         </form>
 
+        <!-- SSO Section -->
+        <div id="sso-section" style="margin-top: 15px;">
+            <div class="sso-divider" style="display: flex; align-items: center; gap: 15px; margin: 25px 0 15px; color: var(--text-gray); font-size: 0.85rem; font-weight: 500;">
+                <span style="flex: 1; height: 1px; background: #F1F5F9;"></span>
+                <span>Hoặc tiếp tục bằng</span>
+                <span style="flex: 1; height: 1px; background: #F1F5F9;"></span>
+            </div>
+            
+            <div id="google-login-container" style="display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; width: 100%;">
+                <!-- Google GIS official button container -->
+                <div id="g_id_signin_btn" style="width: 100%; display: none;"></div>
+                
+                <!-- Fallback/Mock Login Button -->
+                <button type="button" id="mock-google-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; border-radius: 16px; padding: 13px 18px; border: 2px solid #E2E8F0; font-weight: 600; color: #3C4043; background: white; cursor: pointer; transition: all 0.25s; font-family: inherit; font-size: 0.95rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    <span id="google-btn-text">Đăng nhập bằng Google</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Google Mock Modal -->
+        <div class="google-modal-overlay" id="google-modal-overlay">
+            <div class="google-modal">
+                <div class="google-modal-header">
+                    <svg width="38" height="38" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    <div>
+                        <h3 id="modal-google-title">Đăng nhập với Google</h3>
+                        <p>Chế độ thử nghiệm (Mock SSO)</p>
+                    </div>
+                </div>
+                <label for="modal-email">Địa chỉ Email Google</label>
+                <input type="email" id="modal-email" placeholder="example@gmail.com" autocomplete="email">
+                <label for="modal-name">Họ và tên</label>
+                <input type="text" id="modal-name" placeholder="Nguyễn Văn A" autocomplete="name">
+                <div class="google-modal-actions">
+                    <button class="btn-google-cancel" id="modal-cancel-btn" type="button">Hủy</button>
+                    <button class="btn-google-confirm" id="modal-confirm-btn" type="button">Tiếp tục</button>
+                </div>
+            </div>
+        </div>
+
         <p id="error-msg" class="error-msg">Sai thông tin đăng nhập. Vui lòng thử lại.</p>
     </div>
 
@@ -495,6 +669,15 @@
             });
 
             currentStep = step;
+
+            const ssoSection = document.getElementById('sso-section');
+            if (ssoSection) {
+                if (tabRegister.classList.contains('active') && step > 1) {
+                    ssoSection.style.display = 'none';
+                } else if (tabRegister.classList.contains('active') && step === 1) {
+                    ssoSection.style.display = 'block';
+                }
+            }
         }
 
         function validateStep(step) {
@@ -536,11 +719,29 @@
             return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(i => i.value);
         }
 
+        function setGoogleBtnMode(mode) {
+            // mode: 'login' | 'register'
+            const btnText   = document.getElementById('google-btn-text');
+            const modalTitle = document.getElementById('modal-google-title');
+            if (mode === 'register') {
+                if (btnText)    btnText.textContent   = 'Đăng ký bằng Google';
+                if (modalTitle) modalTitle.textContent = 'Đăng ký với Google';
+            } else {
+                if (btnText)    btnText.textContent   = 'Đăng nhập bằng Google';
+                if (modalTitle) modalTitle.textContent = 'Đăng nhập với Google';
+            }
+        }
+
         tabLogin.addEventListener('click', () => {
             tabLogin.classList.add('active');
             tabRegister.classList.remove('active');
             loginForm.style.display = 'block';
             registerForm.style.display = 'none';
+            
+            const ssoSection = document.getElementById('sso-section');
+            if (ssoSection) ssoSection.style.display = 'block';
+            setGoogleBtnMode('login');
+            resetGoogleRegisterState();
         });
 
         tabRegister.addEventListener('click', () => {
@@ -548,6 +749,19 @@
             tabLogin.classList.remove('active');
             registerForm.style.display = 'block';
             loginForm.style.display = 'none';
+            
+            const ssoSection = document.getElementById('sso-section');
+            if (ssoSection) {
+                if (currentStep === 1) {
+                    ssoSection.style.display = 'block';
+                } else {
+                    ssoSection.style.display = 'none';
+                }
+            }
+            setGoogleBtnMode('register');
+            if (!window.googleRegisterData) {
+                resetGoogleRegisterState();
+            }
         });
 
         loginForm.addEventListener('submit', async (e) => {
@@ -599,6 +813,11 @@
                 }
             };
 
+            if (window.googleRegisterData) {
+                formData.isGoogleRegister = true;
+                formData.avatar_url = window.googleRegisterData.picture;
+            }
+
             try {
                 const res = await fetch(`${API_URL}/register`, {
                     method: 'POST',
@@ -616,6 +835,265 @@
             } catch (err) {
                 showError('Lỗi kết nối server');
             }
+        });
+
+        // Forgot Password Form Toggle
+        const forgotForm = document.getElementById('forgot-form');
+        const linkForgot = document.getElementById('link-forgot');
+        const backToLogin = document.getElementById('back-to-login');
+        const authTabs = document.querySelector('.auth-tabs');
+
+        linkForgot.addEventListener('click', (e) => {
+            e.preventDefault();
+            authTabs.style.display = 'none';
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'none';
+            forgotForm.style.display = 'block';
+            errorMsg.style.display = 'none';
+            document.getElementById('sso-section').style.display = 'none';
+        });
+
+        backToLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            authTabs.style.display = 'flex';
+            loginForm.style.display = 'block';
+            forgotForm.style.display = 'none';
+            errorMsg.style.display = 'none';
+            document.getElementById('sso-section').style.display = 'block';
+        });
+
+        forgotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('forgot-email').value;
+            const username = document.getElementById('forgot-username').value;
+            const new_password = document.getElementById('forgot-password').value;
+            const confirm_password = document.getElementById('forgot-confirm-password').value;
+
+            if (new_password !== confirm_password) {
+                showError('Mật khẩu mới không trùng khớp.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, new_password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.');
+                    authTabs.style.display = 'flex';
+                    loginForm.style.display = 'block';
+                    forgotForm.style.display = 'none';
+                    errorMsg.style.display = 'none';
+                    document.getElementById('sso-section').style.display = 'block';
+                    forgotForm.reset();
+                } else {
+                    showError(data.msg);
+                }
+            } catch (err) {
+                showError('Lỗi kết nối server');
+            }
+        });
+
+        // Google / SSO login
+        window.googleRegisterData = null;
+        let googleClientId = '';
+        const mockGoogleBtn = document.getElementById('mock-google-btn');
+
+        function resetGoogleRegisterState() {
+            window.googleRegisterData = null;
+            
+            const regEmailInput = document.getElementById('reg-email');
+            if (regEmailInput) {
+                regEmailInput.value = '';
+                regEmailInput.readOnly = false;
+                regEmailInput.style.backgroundColor = '';
+            }
+            
+            const regPasswordInput = document.getElementById('reg-password');
+            if (regPasswordInput) {
+                regPasswordInput.value = '';
+                regPasswordInput.parentElement.style.display = 'block';
+            }
+        }
+
+        async function processGoogleAuthResult(data) {
+            if (data.exists) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                window.location.href = 'index.html#subjects';
+            } else {
+                alert('Tài khoản Google này chưa có trong hệ thống. Vui lòng hoàn tất hồ sơ năng lực học tập để tạo tài khoản!');
+                
+                window.googleRegisterData = data.googleData;
+
+                // Auto-populate Step 1 registration fields
+                document.getElementById('reg-username').value = data.googleData.email.split('@')[0];
+                document.getElementById('reg-fullname').value = data.googleData.name;
+                
+                const regEmailInput = document.getElementById('reg-email');
+                regEmailInput.value = data.googleData.email;
+                regEmailInput.readOnly = true;
+                regEmailInput.style.backgroundColor = '#f1f5f9';
+
+                // Auto-populate and hide password field
+                const regPasswordInput = document.getElementById('reg-password');
+                regPasswordInput.value = 'google_sso_dummy_pwd';
+                regPasswordInput.parentElement.style.display = 'none';
+
+                // Switch to register tab view
+                tabRegister.classList.add('active');
+                tabLogin.classList.remove('active');
+                registerForm.style.display = 'block';
+                loginForm.style.display = 'none';
+                
+                // Hide SSO buttons
+                document.getElementById('sso-section').style.display = 'none';
+
+                // Go directly to Step 2 (Survey)
+                goToStep(2);
+            }
+        }
+
+        async function initGoogleLogin() {
+            try {
+                const res = await fetch(`${API_URL}/config`);
+                const data = await res.json();
+                googleClientId = data.googleClientId;
+                
+                if (googleClientId && googleClientId !== 'your_google_client_id_here') {
+                    // Real Google Client ID found — use official GIS
+                    google.accounts.id.initialize({
+                        client_id: googleClientId,
+                        callback: handleGoogleLoginResponse,
+                        auto_select: false,
+                        cancel_on_tap_outside: true
+                    });
+
+                    // Render the official Google button (replaces mock button)
+                    const gisContainer = document.getElementById("g_id_signin_btn");
+                    gisContainer.style.display = 'block';
+                    google.accounts.id.renderButton(gisContainer, {
+                        theme: "outline",
+                        size: "large",
+                        width: gisContainer.offsetWidth || 380,
+                        shape: "rectangular",
+                        logo_alignment: "left",
+                        text: "signin_with"
+                    });
+
+                    // Hide mock button — not needed when real Client ID is set
+                    document.getElementById('mock-google-btn').style.display = 'none';
+
+                    // Show One Tap prompt (optional, seamless returning-user login)
+                    google.accounts.id.prompt();
+                } else {
+                    // No real Client ID → keep mock button visible
+                    console.info("Google Client ID not configured — using mock SSO button.");
+                }
+            } catch (err) {
+                console.error("Google SSO initialization failed", err);
+            }
+        }
+
+        async function handleGoogleLoginResponse(response) {
+            try {
+                const res = await fetch(`${API_URL}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    await processGoogleAuthResult(data);
+                } else {
+                    showError(data.msg);
+                }
+            } catch (err) {
+                showError('Lỗi kết nối server khi đăng nhập bằng Google.');
+            }
+        }
+
+        // Google Mock Modal logic
+        const googleModalOverlay = document.getElementById('google-modal-overlay');
+        const modalEmailInput    = document.getElementById('modal-email');
+        const modalNameInput     = document.getElementById('modal-name');
+        const modalCancelBtn     = document.getElementById('modal-cancel-btn');
+        const modalConfirmBtn    = document.getElementById('modal-confirm-btn');
+
+        mockGoogleBtn.addEventListener('click', () => {
+            modalEmailInput.value = '';
+            modalNameInput.value  = '';
+            googleModalOverlay.classList.add('active');
+            setTimeout(() => modalEmailInput.focus(), 100);
+        });
+
+        modalCancelBtn.addEventListener('click', () => {
+            googleModalOverlay.classList.remove('active');
+        });
+
+        googleModalOverlay.addEventListener('click', (e) => {
+            if (e.target === googleModalOverlay) googleModalOverlay.classList.remove('active');
+        });
+
+        async function submitMockGoogle() {
+            const email = modalEmailInput.value.trim();
+            const name  = modalNameInput.value.trim();
+            if (!email || !email.includes('@')) {
+                modalEmailInput.focus();
+                modalEmailInput.style.borderColor = '#EF4444';
+                return;
+            }
+            if (!name) {
+                modalNameInput.focus();
+                modalNameInput.style.borderColor = '#EF4444';
+                return;
+            }
+            modalEmailInput.style.borderColor = '';
+            modalNameInput.style.borderColor  = '';
+
+            modalConfirmBtn.textContent = 'Đang xử lý...';
+            modalConfirmBtn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        isMock: true,
+                        mockData: {
+                            email,
+                            name,
+                            picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=FF8A00&color=fff&size=120`,
+                            sub: 'mock_google_' + Math.random().toString(36).substring(7)
+                        }
+                    })
+                });
+                const data = await res.json();
+                googleModalOverlay.classList.remove('active');
+                if (res.ok) {
+                    await processGoogleAuthResult(data);
+                } else {
+                    showError(data.msg);
+                }
+            } catch (err) {
+                showError('Lỗi kết nối server khi đăng nhập bằng Google.');
+            } finally {
+                modalConfirmBtn.textContent = 'Tiếp tục';
+                modalConfirmBtn.disabled = false;
+            }
+        }
+
+        modalConfirmBtn.addEventListener('click', submitMockGoogle);
+        [modalEmailInput, modalNameInput].forEach(inp => {
+            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitMockGoogle(); });
+        });
+
+        // Initialize Google Sign-in on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initGoogleLogin, 500);
         });
 
         function showError(msg) {
