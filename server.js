@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const db = require('./db');
 require('dotenv').config();
 
@@ -92,6 +92,15 @@ function maskApiKey(apiKey) {
     if (!apiKey) return '';
     if (apiKey.length <= 8) return '********';
     return `${apiKey.slice(0, 4)}${'*'.repeat(Math.min(20, apiKey.length - 8))}${apiKey.slice(-4)}`;
+}
+
+function repairUtf8Mojibake(value) {
+    if (typeof value !== 'string' || !/[ÃÂÄÆÐáºá»]/.test(value)) {
+        return value;
+    }
+
+    const repaired = Buffer.from(value, 'latin1').toString('utf8');
+    return repaired.includes('\uFFFD') ? value : repaired.normalize('NFC');
 }
 
 // 0. Auth Endpoints
@@ -497,7 +506,18 @@ app.delete('/api/admin/user/:id', [auth, adminAuth], async (req, res) => {
 app.get('/api/admin/quizzes', [auth, adminAuth], async (req, res) => {
     try {
         const result = await db.query('SELECT q.*, s.name as subject_name FROM quizzes q JOIN subjects s ON q.subject_id = s.id ORDER BY q.id DESC');
-        res.json(result.rows);
+        const quizzes = await Promise.all(result.rows.map(async (quiz) => {
+            const repairedTitle = repairUtf8Mojibake(quiz.title);
+            if (repairedTitle !== quiz.title) {
+                await db.query('UPDATE quizzes SET title = $1 WHERE id = $2', [repairedTitle, quiz.id]);
+            }
+            return {
+                ...quiz,
+                title: repairedTitle,
+                subject_name: repairUtf8Mojibake(quiz.subject_name)
+            };
+        }));
+        res.json(quizzes);
     } catch (err) {
         res.status(500).json({ msg: 'Server Error' });
     }
@@ -550,13 +570,22 @@ app.get('/api/admin/dashboard-stats', [auth, adminAuth], async (req, res) => {
 
         // Recent attempts
         const recentAttempts = await db.query(`
-            SELECT r.id, u.username, q.title as quiz_title, r.score, TO_CHAR(r.completed_at, 'HH24:MI DD/MM') as date
+            SELECT r.id, u.username, q.id as quiz_id, q.title as quiz_title, r.score,
+                   TO_CHAR(r.completed_at, 'HH24:MI DD/MM') as date
             FROM results r
             JOIN users u ON r.user_id = u.id
             JOIN quizzes q ON r.quiz_id = q.id
             ORDER BY r.completed_at DESC
             LIMIT 5
         `);
+
+        const repairedRecentAttempts = await Promise.all(recentAttempts.rows.map(async (attempt) => {
+            const repairedTitle = repairUtf8Mojibake(attempt.quiz_title);
+            if (repairedTitle !== attempt.quiz_title) {
+                await db.query('UPDATE quizzes SET title = $1 WHERE id = $2', [repairedTitle, attempt.quiz_id]);
+            }
+            return { ...attempt, quiz_title: repairedTitle };
+        }));
 
         res.json({
             users: parseInt(usersCount.rows[0].count || 0),
@@ -567,7 +596,7 @@ app.get('/api/admin/dashboard-stats', [auth, adminAuth], async (req, res) => {
             scoresSubject: scoresSubject.rows,
             attemptsSubject: attemptsSubject.rows,
             scoreDist: scoreDist.rows[0],
-            recentAttempts: recentAttempts.rows
+            recentAttempts: repairedRecentAttempts
         });
     } catch (err) {
         console.error("Dashboard Stats Error:", err);
@@ -635,15 +664,69 @@ app.get('/api/admin/quiz/:id/questions', [auth, adminAuth], async (req, res) => 
 
 // Admin: Update Quiz
 app.put('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
-    const { title, subject_id, grade, duration_minutes } = req.body;
+    const { title, subject_id, grade, duration_minutes, questions } = req.body;
+    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+    const normalizedQuestions = Array.isArray(questions) ? questions : [];
+
+    if (!normalizedTitle || !subject_id || !grade || !duration_minutes) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ thông tin đề thi.' });
+    }
+    if (normalizedQuestions.length === 0) {
+        return res.status(400).json({ msg: 'Đề thi phải có ít nhất một câu hỏi.' });
+    }
+    const isNonEmptyString = value => typeof value === 'string' && value.trim().length > 0;
+    if (normalizedQuestions.some(q =>
+        !q ||
+        !isNonEmptyString(q.content) ||
+        !isNonEmptyString(q.option_a) ||
+        !isNonEmptyString(q.option_b) ||
+        !isNonEmptyString(q.option_c) ||
+        !isNonEmptyString(q.option_d) ||
+        !['A', 'B', 'C', 'D'].includes(q.correct_option)
+    )) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ nội dung, bốn đáp án và đáp án đúng cho mỗi câu hỏi.' });
+    }
+
+    const client = await db.pool.connect();
     try {
-        const result = await db.query(
+        await client.query('BEGIN');
+        const result = await client.query(
             'UPDATE quizzes SET title = $1, subject_id = $2, grade = $3, duration_minutes = $4 WHERE id = $5 RETURNING *',
-            [title, subject_id, grade, duration_minutes, req.params.id]
+            [normalizedTitle, subject_id, grade, duration_minutes, req.params.id]
         );
-        res.json(result.rows[0]);
+
+        if (result.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ msg: 'Không tìm thấy đề thi.' });
+        }
+
+        await client.query('DELETE FROM questions WHERE quiz_id = $1', [req.params.id]);
+        for (const question of normalizedQuestions) {
+            await client.query(
+                `INSERT INTO questions
+                 (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                    req.params.id,
+                    question.content.trim(),
+                    question.option_a.trim(),
+                    question.option_b.trim(),
+                    question.option_c.trim(),
+                    question.option_d.trim(),
+                    question.correct_option,
+                    typeof question.explanation === 'string' ? question.explanation.trim() : ''
+                ]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ msg: 'Đã cập nhật đề thi thành công.', quiz: result.rows[0] });
     } catch (err) {
-        res.status(500).json({ msg: 'Server Error' });
+        await client.query('ROLLBACK');
+        console.error('Update Quiz Error:', err);
+        res.status(500).json({ msg: 'Không thể cập nhật đề thi.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -729,10 +812,69 @@ function isRecoverableAiError(err) {
     );
 }
 
+const quizQuestionsSchema = {
+    type: SchemaType.ARRAY,
+    items: {
+        type: SchemaType.OBJECT,
+        properties: {
+            content: { type: SchemaType.STRING },
+            option_a: { type: SchemaType.STRING },
+            option_b: { type: SchemaType.STRING },
+            option_c: { type: SchemaType.STRING },
+            option_d: { type: SchemaType.STRING },
+            correct_option: {
+                type: SchemaType.STRING,
+                format: 'enum',
+                enum: ['A', 'B', 'C', 'D']
+            },
+            explanation: { type: SchemaType.STRING }
+        },
+        required: [
+            'content',
+            'option_a',
+            'option_b',
+            'option_c',
+            'option_d',
+            'correct_option',
+            'explanation'
+        ]
+    }
+};
+
+function parseAiQuizQuestions(aiText) {
+    const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+        throw new Error('AI did not return a valid JSON array.');
+    }
+
+    let json = jsonMatch[0]
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+        .replace(/,\s*([}\]])/g, '$1')
+        .trim();
+
+    const latexCommand = /(?<!\\)\\(?=(?:alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|phi|omega|frac|sqrt|sum|int|lim|times|cdot|div|pm|leq|geq|neq|infty|to|rightarrow|left|right|mathrm|text|overline|vec|Delta)\b)/g;
+    json = json.replace(latexCommand, '\\\\');
+
+    try {
+        return JSON.parse(json);
+    } catch (initialError) {
+        // Preserve LaTeX commands when the model emits \alpha instead of \\alpha.
+        json = json.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+        try {
+            return JSON.parse(json);
+        } catch {
+            throw new Error(`AI returned malformed JSON: ${initialError.message}`);
+        }
+    }
+}
+
 // 9. Admin: Scan PDF/Word
 app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded.');
     const { subject_id, grade, duration } = req.body;
+    const originalFilename = repairUtf8Mojibake(req.file.originalname);
     let text = '';
     
     try {
@@ -752,7 +894,13 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
 
         // Use Gemini to parse the extracted text into structured questions
         const gemini = await getGeminiClient();
-        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = gemini.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: quizQuestionsSchema
+            }
+        });
         const prompt = `Bạn là một chuyên gia soạn đề thi. Hãy trích xuất các câu hỏi trắc nghiệm từ văn bản sau đây.
         Yêu cầu:
         1. Trả về định dạng JSON là một mảng các đối tượng.
@@ -764,20 +912,11 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
         const aiText = result.response.text();
         console.log("AI Scan Response:", aiText);
 
-        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) throw new Error("Could not parse AI response: No JSON array found");
-        
-        let questions;
-        try {
-            questions = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-            const cleaned = jsonMatch[0].replace(/```json/g, '').replace(/```/g, '').trim();
-            questions = JSON.parse(cleaned);
-        }
+        const questions = parseAiQuizQuestions(aiText);
 
         const isPreview = (req.body.preview === 'true' || req.query.preview === 'true');
         if (isPreview) {
-            const cleanedFilename = req.file.originalname.replace(/\.[^/.]+$/, "");
+            const cleanedFilename = originalFilename.replace(/\.[^/.]+$/, "");
             return res.json({
                 msg: 'Quiz parsed successfully',
                 preview: true,
@@ -795,7 +934,7 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
 
             const newQuiz = await client.query(
                 'INSERT INTO quizzes (title, subject_id, grade, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING *',
-                [`Đề Scan: ${req.file.originalname}`, subject_id, grade, duration || 15]
+                [`Đề Scan: ${originalFilename}`, subject_id, grade, duration || 15]
             );
 
             const quizId = newQuiz.rows[0].id;
@@ -817,7 +956,7 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
     } catch (err) {
         if (isRecoverableAiError(err) && req.file) {
             console.warn("AI scan temporarily unavailable. Falling back to local/mock scan quiz:", err.message);
-            const cleanedFilename = req.file.originalname.replace(/\.[^/.]+$/, "");
+            const cleanedFilename = originalFilename.replace(/\.[^/.]+$/, "");
             const locallyParsedQuestions = text ? parseQuizLocally(text) : [];
             const usingLocalParse = locallyParsedQuestions.length > 0;
             const questions = usingLocalParse ? locallyParsedQuestions : [
@@ -862,11 +1001,11 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
                 await client.query('BEGIN');
                 const newQuiz = await client.query(
                     'INSERT INTO quizzes (title, subject_id, grade, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING *',
-                    [`Đề Scan: ${req.file.originalname} (Mock)`, subject_id, grade, duration || 15]
+                    [`Đề Scan: ${originalFilename} (Mock)`, subject_id, grade, duration || 15]
                 );
                 const quizId = newQuiz.rows[0].id;
                 if (usingLocalParse) {
-                    const localTitle = `Đề Scan: ${req.file.originalname}`;
+                    const localTitle = `Đề Scan: ${originalFilename}`;
                     await client.query('UPDATE quizzes SET title = $1 WHERE id = $2', [localTitle, quizId]);
                     newQuiz.rows[0].title = localTitle;
                 }
@@ -899,12 +1038,25 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
 // 11. Admin: Delete Quiz
 app.delete('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
     const { id } = req.params;
+    const client = await db.pool.connect();
     try {
-        await db.query('DELETE FROM quizzes WHERE id = $1', [id]);
-        res.json({ msg: 'Quiz deleted successfully' });
+        await client.query('BEGIN');
+        await client.query('DELETE FROM results WHERE quiz_id = $1', [id]);
+        const deletedQuiz = await client.query('DELETE FROM quizzes WHERE id = $1 RETURNING id', [id]);
+
+        if (deletedQuiz.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ msg: 'Không tìm thấy đề thi.' });
+        }
+
+        await client.query('COMMIT');
+        res.json({ msg: 'Đã xóa đề thi và các lượt thi liên quan.' });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ msg: 'Server Error' });
+        await client.query('ROLLBACK');
+        console.error('Delete Quiz Error:', err.message);
+        res.status(500).json({ msg: 'Không thể xóa đề thi.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -925,7 +1077,13 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
     
     try {
         const gemini = await getGeminiClient();
-        const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = gemini.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: quizQuestionsSchema
+            }
+        });
         // Improve prompt for JSON reliability and LaTeX formatting
         const prompt = `
             Bạn là một chuyên gia biên soạn đề thi trắc nghiệm theo chuẩn của Bộ Giáo dục và Đào tạo Việt Nam.
@@ -974,7 +1132,7 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
         // Fix potential trailing commas before closing bracket
         cleanedJson = cleanedJson.replace(/,\s*\]/g, ']');
         
-        const questions = JSON.parse(cleanedJson);
+        const questions = parseAiQuizQuestions(cleanedJson);
 
         const isPreview = (req.body.preview === true || req.body.preview === 'true' || req.query.preview === 'true');
         if (isPreview) {
@@ -1353,7 +1511,17 @@ app.post('/api/roadmap/generate', auth, async (req, res) => {
 module.exports = app;
 
 if (require.main === module) {
-    app.listen(PORT, () => {
+    app.listen(PORT, (err) => {
+        if (err) {
+            if (err.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use. Stop the existing process or set a different PORT in .env.`);
+            } else {
+                console.error('Failed to start server:', err);
+            }
+            process.exitCode = 1;
+            return;
+        }
+
         console.log(`Server is running on port ${PORT}`);
     });
 }

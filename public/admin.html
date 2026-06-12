@@ -147,6 +147,21 @@
         .admin-section.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Keep Vietnamese diacritics consistent when the web font is unavailable. */
+        #section-quizzes,
+        #section-quizzes button,
+        #section-quizzes table {
+            font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+        }
+        #section-quizzes .ranking-table th {
+            text-transform: none;
+            letter-spacing: 0.2px;
+        }
+        #section-quizzes .ranking-table td {
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+
         /* Login Overlay for Admin */
         #admin-login-overlay {
             position: fixed;
@@ -431,7 +446,7 @@
                 <li onclick="showSection('quizzes', this)">📝 Quản lý Đề thi</li>
                 <li onclick="showSection('scan', this)">📄 Quét file PDF</li>
                 <li onclick="showSection('ai-gen', this)">✨ Tạo đề bằng AI</li>
-                <li onclick="showSection('manual', this)">✍️ Tạo đề thủ công</li>
+                <li onclick="startNewManualQuiz(this)">✍️ Tạo đề thủ công</li>
                 <li onclick="showSection('settings', this)">⚙️ Cấu hình Gemini</li>
                 <li onclick="logoutAdmin()" style="margin-top: 50px; color: #f87171;">🚪 Đăng xuất</li>
             </ul>
@@ -606,8 +621,8 @@
 
             <section id="section-manual" class="admin-section">
                 <div class="tool-card">
-                    <h2 style="color: var(--primary);">✍️ Tạo đề thi thủ công</h2>
-                    <p style="color: var(--text-gray); margin-bottom: 30px;">Nhập thông tin đề thi và các câu hỏi bên dưới.</p>
+                    <h2 id="manual-form-title" style="color: var(--primary);">✍️ Tạo đề thi thủ công</h2>
+                    <p id="manual-form-description" style="color: var(--text-gray); margin-bottom: 30px;">Nhập thông tin đề thi và các câu hỏi bên dưới.</p>
                     
                     <div style="background: #f8fafc; padding: 25px; border-radius: 20px; margin-bottom: 30px; border: 1px solid #e2e8f0;">
                         <h4 style="margin-bottom: 15px; color: var(--secondary);">1. Thông tin chung</h4>
@@ -809,6 +824,8 @@
             } catch (err) { console.error(err); }
         }
 
+        let adminQuizzes = [];
+
         async function loadQuizzes() {
             const token = localStorage.getItem('token');
             try {
@@ -816,14 +833,16 @@
                 if (res.status === 401) return checkAdmin();
                 const quizzes = await res.json();
                 if (!Array.isArray(quizzes)) return;
+                adminQuizzes = quizzes;
                 const statQuizzes = document.getElementById('stat-quizzes');
                 if (statQuizzes) statQuizzes.textContent = quizzes.length;
                 document.getElementById('admin-quizzes-list').innerHTML = quizzes.map(q => `
                     <tr>
                         <td>${q.id}</td>
-                        <td><b>${q.title}</b></td>
-                        <td><span class="rank-badge" style="width: auto; padding: 5px 15px; border-radius: 20px; font-size: 12px; background: rgba(255,122,0,0.1); color: var(--primary);">${q.subject_name}</span></td>
+                        <td><b>${escapeHtml(String(q.title || '').normalize('NFC'))}</b></td>
+                        <td><span class="rank-badge" style="width: auto; padding: 5px 15px; border-radius: 20px; font-size: 12px; background: rgba(255,122,0,0.1); color: var(--primary);">${escapeHtml(String(q.subject_name || '').normalize('NFC'))}</span></td>
                         <td style="text-align: right;">
+                            <button onclick="editQuiz(${q.id})" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 18px; margin-right: 10px;" title="Sửa đề thi">✏️</button>
                             <button onclick="deleteQuiz(${q.id})" style="background: none; border: none; color: #f87171; cursor: pointer; font-size: 18px;" title="Xóa đề thi">🗑️</button>
                         </td>
                     </tr>
@@ -1051,14 +1070,62 @@
         }
 
         async function deleteQuiz(id) {
-            if (!confirm('Xóa?')) return;
+            if (!confirm('Xóa đề thi này? Các lượt thi và kết quả liên quan cũng sẽ bị xóa.')) return;
             try {
                 const res = await fetch(`${API_URL}/admin/quiz/${id}`, {
                     method: 'DELETE',
                     headers: { 'x-auth-token': localStorage.getItem('token') }
                 });
-                if (res.ok) loadQuizzes();
-            } catch (err) { console.error(err); }
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.msg || 'Không thể xóa đề thi.');
+                    return;
+                }
+                await loadQuizzes();
+                await loadDashboardStats();
+                alert(data.msg);
+            } catch (err) {
+                console.error(err);
+                alert('Không thể kết nối đến máy chủ.');
+            }
+        }
+
+        async function editQuiz(id) {
+            const quiz = adminQuizzes.find(item => Number(item.id) === Number(id));
+            if (!quiz) {
+                alert('Không tìm thấy thông tin đề thi.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/admin/quiz/${id}/questions`, {
+                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                });
+                const questions = await res.json();
+                if (!res.ok) {
+                    alert(questions.msg || 'Không thể tải câu hỏi của đề thi.');
+                    return;
+                }
+
+                currentEditingQuizId = id;
+                const manualLi = Array.from(document.querySelectorAll('.sidebar-nav li'))
+                    .find(li => li.textContent.includes('Tạo đề thủ công'));
+                showSection('manual', manualLi);
+
+                document.getElementById('manual-form-title').textContent = '✏️ Sửa đề thi';
+                document.getElementById('manual-form-description').textContent = 'Cập nhật thông tin và danh sách câu hỏi của đề thi.';
+                document.getElementById('btn-save-manual').textContent = 'Cập nhật đề thi';
+                document.getElementById('man-title').value = quiz.title || '';
+                document.getElementById('man-subject').value = quiz.subject_id || '';
+                document.getElementById('man-grade').value = quiz.grade || '12';
+                document.getElementById('man-duration').value = quiz.duration_minutes || 15;
+
+                resetQuestionEditor();
+                questions.forEach(question => addQuestionToEditor(question));
+            } catch (err) {
+                console.error(err);
+                alert('Không thể kết nối đến máy chủ.');
+            }
         }
 
         function logoutAdmin() {
@@ -1067,9 +1134,38 @@
             window.location.reload();
         }
 
+        let currentEditingQuizId = null;
         let manualQuestionCount = 0;
+
+        function resetQuestionEditor() {
+            document.getElementById('manual-questions-list').innerHTML =
+                '<h4 style="margin-bottom: 15px; color: var(--secondary);">2. Danh sách câu hỏi</h4>';
+            manualQuestionCount = 0;
+        }
+
+        function startNewManualQuiz(element) {
+            currentEditingQuizId = null;
+            document.getElementById('manual-form-title').textContent = '✍️ Tạo đề thi thủ công';
+            document.getElementById('manual-form-description').textContent = 'Nhập thông tin đề thi và các câu hỏi bên dưới.';
+            document.getElementById('btn-save-manual').textContent = 'Lưu đề thi ngay';
+            document.getElementById('man-title').value = '';
+            document.getElementById('man-grade').value = '12';
+            document.getElementById('man-duration').value = 15;
+            resetQuestionEditor();
+            showSection('manual', element);
+        }
+
         function addManualQuestion() {
             addQuestionToEditor();
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         function addQuestionToEditor(q = null) {
@@ -1079,13 +1175,13 @@
             qDiv.className = 'manual-question-block';
             qDiv.style = "background: white; padding: 25px; border-radius: 20px; border: 1px solid #e2e8f0; margin-bottom: 25px; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);";
             
-            const content = q ? q.content : '';
-            const optA = q ? q.option_a : '';
-            const optB = q ? q.option_b : '';
-            const optC = q ? q.option_c : '';
-            const optD = q ? q.option_d : '';
+            const content = escapeHtml(q ? q.content : '');
+            const optA = escapeHtml(q ? q.option_a : '');
+            const optB = escapeHtml(q ? q.option_b : '');
+            const optC = escapeHtml(q ? q.option_c : '');
+            const optD = escapeHtml(q ? q.option_d : '');
             const correct = q ? q.correct_option : 'A';
-            const explain = q ? q.explanation : '';
+            const explain = escapeHtml(q ? q.explanation : '');
 
             qDiv.innerHTML = `
                 <button onclick="this.parentElement.remove(); reindexQuestions();" style="position: absolute; right: 15px; top: 15px; background: #fee2e2; border: none; color: #ef4444; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
@@ -1147,7 +1243,7 @@
             }));
 
             if (questions.length === 0) return alert('Hãy thêm ít nhất 1 câu hỏi!');
-            if (questions.some(q => !q.content || !q.option_a || !q.option_b)) {
+            if (questions.some(q => !q.content || !q.option_a || !q.option_b || !q.option_c || !q.option_d)) {
                 return alert('Vui lòng điền đầy đủ nội dung câu hỏi và các đáp án!');
             }
 
@@ -1157,18 +1253,34 @@
             btn.textContent = '⌛ Đang lưu đề thi...';
 
             try {
-                const res = await fetch(`${API_URL}/admin/quiz-manual`, {
-                    method: 'POST',
+                const isEditing = currentEditingQuizId !== null;
+                const endpoint = isEditing
+                    ? `${API_URL}/admin/quiz/${currentEditingQuizId}`
+                    : `${API_URL}/admin/quiz-manual`;
+                const res = await fetch(endpoint, {
+                    method: isEditing ? 'PUT' : 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         'x-auth-token': localStorage.getItem('token') 
                     },
-                    body: JSON.stringify({ title, subject_id, grade, duration, questions })
+                    body: JSON.stringify({
+                        title,
+                        subject_id,
+                        grade,
+                        duration,
+                        duration_minutes: duration,
+                        questions
+                    })
                 });
 
                 if (res.ok) {
-                    alert('🎉 Chúc mừng! Đề thi đã được tạo thành công.');
-                    window.location.reload();
+                    const data = await res.json();
+                    alert(data.msg || (isEditing ? 'Đã cập nhật đề thi thành công.' : 'Đề thi đã được tạo thành công.'));
+                    currentEditingQuizId = null;
+                    await loadQuizzes();
+                    await loadDashboardStats();
+                    showSection('quizzes', Array.from(document.querySelectorAll('.sidebar-nav li'))
+                        .find(li => li.textContent.includes('Quản lý Đề thi')));
                 } else {
                     const data = await res.json();
                     alert('❌ Lỗi: ' + data.msg);
@@ -1210,18 +1322,20 @@
 
         // Load previewed data into manual quiz builder
         function loadPreviewIntoEditor(data) {
+            currentEditingQuizId = null;
             // Switch to manual section
             const manualLi = Array.from(document.querySelectorAll('.sidebar-nav li')).find(li => li.textContent.includes('Tạo đề thủ công'));
             showSection('manual', manualLi);
+            document.getElementById('manual-form-title').textContent = '✍️ Tạo đề thi thủ công';
+            document.getElementById('manual-form-description').textContent = 'Kiểm tra và chỉnh sửa nội dung trước khi lưu đề thi.';
+            document.getElementById('btn-save-manual').textContent = 'Lưu đề thi ngay';
 
             document.getElementById('man-title').value = data.title || '';
             document.getElementById('man-subject').value = data.subject_id || '';
             document.getElementById('man-grade').value = data.grade || '12';
             document.getElementById('man-duration').value = data.duration || 15;
 
-            const container = document.getElementById('manual-questions-list');
-            container.innerHTML = '<h4 style="margin-bottom: 15px; color: var(--secondary);">2. Danh sách câu hỏi</h4>';
-            manualQuestionCount = 0;
+            resetQuestionEditor();
 
             if (data.questions && data.questions.length) {
                 data.questions.forEach(q => {
@@ -1399,8 +1513,8 @@
                 document.getElementById('recent-attempts-list').innerHTML = data.recentAttempts.map(r => `
                     <tr style="border-bottom: 1px solid #f1f5f9;">
                         <td style="padding: 12px 0; font-weight: 600; color: #334155;">${r.username}</td>
-                        <td style="padding: 12px 0; color: #475569;">${r.quiz_title}</td>
-                        <td style="padding: 12px 0;"><span style="font-weight: 800; color: ${parseFloat(r.score) >= 8 ? '#10B981' : parseFloat(r.score) >= 5 ? '#FF7A00' : '#EF4444'};">${r.score}</span></td>
+                        <td style="padding: 12px 0; color: #475569;">${String(r.quiz_title || '').normalize('NFC')}</td>
+                        <td style="padding: 12px 0;"><span style="font-weight: 800; color: ${parseFloat(r.score) >= 8 ? '#10B981' : parseFloat(r.score) >= 5 ? '#FF7A00' : '#EF4444'};">${Number(parseFloat(r.score).toFixed(1))}</span></td>
                         <td style="padding: 12px 0; color: #94a3b8; font-size: 0.85rem; text-align: right;">${r.date}</td>
                     </tr>
                 `).join('');

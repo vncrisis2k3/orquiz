@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE TABLE IF NOT EXISTS results (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
-    quiz_id INT REFERENCES quizzes(id),
+    quiz_id INT REFERENCES quizzes(id) ON DELETE CASCADE,
     score FLOAT NOT NULL,
     correct_answers_count INT,
     total_questions INT,
