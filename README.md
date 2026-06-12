@@ -1,86 +1,201 @@
-# Orange Quiz Platform 🍊
+# EduFlow
 
-Một nền tảng thi trắc nghiệm trực tuyến thế hệ mới, tích hợp Trí tuệ nhân tạo (AI) để mang lại trải nghiệm học tập cá nhân hóa, hiện đại và đầy cảm hứng.
+Nền tảng ôn tập và thi trắc nghiệm trực tuyến dành cho học sinh THPT, tích hợp Google Gemini để hỗ trợ hỏi đáp, phân tích kết quả, tạo đề và xây dựng lộ trình học tập cá nhân hóa.
 
-![Hero Image](hero.png)
+![EduFlow](public/hero.png)
 
-## 🌟 Tính năng đột phá
+## Tính năng
 
-*   **🤖 AI Roadmap Generator:** Hệ thống phân tích kết quả bài thi và mục tiêu học tập để tạo ra lộ trình học tập 4 tuần cá nhân hóa bằng Google Gemini AI.
-*   **📄 AI Document Scanner:** Tự động trích xuất câu hỏi từ các file PDF và Word (DOCX) với độ chính xác cao, giúp xây dựng ngân hàng đề thi chỉ trong tích tắc.
-*   **✨ Giao diện Glassmorphism:** Trải nghiệm người dùng cao cấp với hiệu ứng kính mờ, chuyển động mượt mà và thiết kế hiện đại, tối ưu trên mọi thiết bị.
-*   **🎲 Smart Quiz Engine:** Tự động lựa chọn đề thi ngẫu nhiên theo môn học, hỗ trợ xem lại đáp án chi tiết và giải thích ngay sau khi hoàn thành.
-*   **📊 Analytics & Ranking:** Theo dõi tiến độ học tập qua biểu đồ và cạnh tranh vị trí dẫn đầu trên bảng xếp hạng thời gian thực.
-*   **🛡️ Professional Admin Suite:** Công cụ quản trị mạnh mẽ giúp quản lý người dùng, đề thi và giám sát hệ thống một cách trực quan.
+### Người dùng
 
-## 🛠️ Công nghệ sử dụng
+- Làm bài kiểm tra theo môn học và khối lớp.
+- Chế độ thi có đếm ngược và tự nộp khi hết giờ.
+- Chế độ luyện tập không giới hạn thời gian.
+- Xem điểm, đáp án sai, giải thích và phân tích kết quả bằng AI.
+- Theo dõi điểm, cấp độ, streak và lịch sử làm bài.
+- Xem bảng xếp hạng người dùng.
+- Dark mode trên toàn bộ giao diện, tự lưu lựa chọn.
 
-Hệ thống được xây dựng với kiến trúc vững chắc và hiệu năng tối ưu:
+### StudyFlow Chatbot
 
-*   **Frontend:** HTML5, Modern CSS3 (Glassmorphism UI), Vanilla JavaScript (ES6+).
-*   **Backend:** Node.js, Express.js.
-*   **AI Engine:** Google Gemini Pro API (Phân tích dữ liệu & Phục hồi kiến thức).
-*   **Database:** PostgreSQL (Hệ quản trị cơ sở dữ liệu quan hệ mạnh mẽ).
-*   **Processing:** `pdf-parse`, `mammoth` (Xử lý tài liệu chuyên sâu).
-*   **Security:** JWT (JSON Web Token), Bcrypt (Mã hóa mật khẩu 10 vòng).
+- Chatbot học tập dùng chung cho mọi môn học.
+- Lưu 10 lượt hỏi đáp gần nhất theo tài khoản trên trình duyệt.
+- Đồng bộ lịch sử giữa chatbot nổi và trang chatbot riêng.
+- Hiển thị công thức toán học bằng KaTeX.
+- Mở toàn màn hình trên thiết bị di động.
 
-## 🚀 Hướng dẫn cài đặt nhanh
+### Roadmap
 
-### 1. Yêu cầu hệ thống
-*   **Node.js:** Phiên bản 18.x trở lên.
-*   **PostgreSQL:** Đang chạy cục bộ hoặc trên cloud.
-*   **Gemini API Key:** Lấy tại [Google AI Studio](https://aistudio.google.com/).
+- Gemini tạo lộ trình học tập cá nhân hóa trong 4 tuần.
+- Phân tích hồ sơ khảo sát và 5 kết quả kiểm tra gần nhất.
+- Lưu và xem lại tối đa 5 roadmap gần nhất.
+- Tương thích với dữ liệu roadmap cũ.
 
-### 2. Khởi tạo dự án
+### Quản trị
+
+- Quản lý người dùng và đề thi.
+- Tạo đề thủ công hoặc tạo tự động bằng Gemini.
+- Quét câu hỏi từ PDF và DOCX.
+- Dashboard thống kê và biểu đồ.
+- Cập nhật Gemini API key trực tiếp trong Admin.
+- API key chỉ hiển thị dạng che và được lưu phía server.
+- Dark mode dành cho giao diện Admin.
+
+## Công nghệ
+
+- Frontend: HTML5, CSS3, Vanilla JavaScript.
+- Backend: Node.js, Express 5.
+- Database: PostgreSQL.
+- AI: Google Gemini qua `@google/generative-ai`.
+- Tài liệu: `pdf-parse`, `mammoth`, `multer`.
+- Bảo mật: JWT và bcrypt.
+- Hiển thị toán học: KaTeX.
+- Biểu đồ Admin: Chart.js.
+
+## Yêu cầu
+
+- Node.js 18 trở lên.
+- PostgreSQL cục bộ hoặc dịch vụ cloud như Neon/Supabase.
+- Gemini API key từ [Google AI Studio](https://aistudio.google.com/).
+
+## Cài đặt
+
 ```bash
-# Di chuyển vào thư mục dự án
-cd quiz3
-
-# Cài đặt các phụ thuộc
 npm install
 ```
 
-### 3. Cấu hình môi trường
-Tạo file `.env` tại thư mục gốc với các thông số sau:
+Tạo file `.env` tại thư mục gốc:
+
 ```env
 PORT=5000
-DB_USER=your_user
+JWT_SECRET=replace_with_a_strong_secret
+ADMIN_SECRET=replace_with_an_admin_secret
+# Tùy chọn nếu sẽ cấu hình key trong Admin
+GEMINI_API_KEY=your_gemini_api_key
+
+# Dùng DATABASE_URL trên cloud
+DATABASE_URL=postgresql://user:password@host:5432/database
+
+# Hoặc cấu hình PostgreSQL riêng lẻ khi chạy local
+DB_USER=postgres
 DB_PASSWORD=your_password
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=orange_quiz
-JWT_SECRET=your_super_secret_key
-GEMINI_API_KEY=your_gemini_key_here
-ADMIN_SECRET=ORANGE_ADMIN_2026
+DB_NAME=eduflow
 ```
 
-### 4. Thiết lập & Chạy ứng dụng
+Không commit file `.env` hoặc Gemini API key lên Git.
+
+## Khởi tạo database
+
 ```bash
-# Khởi tạo cơ sở dữ liệu và dữ liệu mẫu
-node setup_db.js
-
-# Khởi chạy server
-node server.js
+npm run setup-db
 ```
-Mở trình duyệt và truy cập: `c`
 
-## 📂 Cấu trúc dự án
+Script tạo các bảng chính:
+
+- `users`
+- `subjects`
+- `quizzes`
+- `questions`
+- `results`
+- `system_settings`
+
+`system_settings` lưu cấu hình Gemini do Admin cập nhật. Key trong database được ưu tiên hơn `GEMINI_API_KEY` trong `.env`.
+
+## Chạy ứng dụng
+
+```bash
+npm start
+```
+
+Truy cập:
 
 ```text
-├── server.js           # Entry point của ứng dụng & API Routes
-├── db.js               # Cấu hình kết nối PostgreSQL (Pool)
-├── setup_db.js         # Script tạo bảng và khởi tạo schema
-├── style.css           # Design System & Glassmorphism Styles
-├── main.js             # Xử lý Logic Dashboard & UI Interactions
-├── quiz.js             # Engine xử lý bài thi & Kết quả
-├── index.html          # Trang chủ & Lựa chọn môn học
-├── roadmap.html        # Tính năng Lộ trình học tập AI
-├── admin.html          # Bảng điều khiển quản trị viên
-└── profile.html        # Trang cá nhân & Lịch sử thi
+http://localhost:5000
 ```
 
----
-> [!TIP]
-> Để trải nghiệm tính năng AI tốt nhất, hãy đảm bảo bạn đã cung cấp đầy đủ thông tin khảo sát trong trang cá nhân trước khi tạo Lộ trình học tập.
+Các script có sẵn:
 
+```bash
+npm start
+npm run dev
+npm run setup-db
+npm run seed
+npm run migrate
+```
 
+## Cấu hình Gemini trong Admin
+
+1. Đăng nhập bằng tài khoản có quyền Admin. Khi đăng ký Admin, dùng giá trị `ADMIN_SECRET` làm mã bí mật.
+2. Mở mục **Cấu hình Gemini**.
+3. Nhập API key mới và chọn **Lưu API key**.
+4. Key mới có hiệu lực ngay, không cần khởi động lại server.
+
+API không trả key đầy đủ về trình duyệt. Chỉ Admin đã xác thực mới có quyền xem trạng thái hoặc cập nhật key.
+
+## Cấu trúc dự án
+
+```text
+.
+├── api/
+│   └── index.js           # Entry point cho Vercel
+├── public/
+│   ├── admin.html         # Trang quản trị
+│   ├── auth.html          # Đăng nhập và đăng ký
+│   ├── chatbot.html       # Trang StudyFlow Chatbot
+│   ├── index.html         # Trang chủ
+│   ├── leaderboard.html   # Bảng xếp hạng
+│   ├── practice.html      # Chọn bài luyện tập
+│   ├── profile.html       # Hồ sơ và lịch sử học tập
+│   ├── quiz.html          # Giao diện làm bài
+│   ├── quiz.js            # Logic thi và luyện tập
+│   ├── roadmap.html       # Lộ trình học tập AI
+│   ├── main.js            # Logic trang chủ và chatbot nổi
+│   ├── style.css          # Style dùng chung và dark mode
+│   └── theme.js           # Điều khiển theme sáng/tối
+├── db.js                  # Kết nối PostgreSQL
+├── migrate.js             # Migration bổ sung
+├── seed_data.js           # Dữ liệu mẫu
+├── server.js              # Express API và nghiệp vụ
+├── setup_db.js            # Khởi tạo schema
+└── vercel.json            # Cấu hình triển khai Vercel
+```
+
+## API chính
+
+- `POST /api/register`
+- `POST /api/login`
+- `GET /api/auth/user`
+- `GET /api/subjects`
+- `GET /api/quizzes/:subject_id`
+- `POST /api/results`
+- `POST /api/chat`
+- `GET /api/roadmap/history`
+- `POST /api/roadmap/generate`
+- `GET /api/admin/settings/gemini`
+- `PUT /api/admin/settings/gemini`
+
+Các API người dùng và Admin yêu cầu JWT trong header:
+
+```http
+x-auth-token: <token>
+```
+
+## Triển khai Vercel
+
+Dự án đã có `vercel.json`:
+
+- `/api/*` được chuyển đến `api/index.js`.
+- File giao diện được phục vụ từ `public/`.
+
+Khi triển khai, cần cấu hình các biến môi trường:
+
+```text
+DATABASE_URL
+JWT_SECRET
+ADMIN_SECRET
+GEMINI_API_KEY (tùy chọn nếu sẽ cấu hình trong Admin)
+```
+
+Sau khi triển khai, Admin có thể thay Gemini API key trong giao diện mà không cần sửa biến môi trường.

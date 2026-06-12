@@ -465,6 +465,29 @@ function initFloatingChatbot() {
     let dragOffsetY = 0;
     let isDraggingChat = false;
     let didMoveChat = false;
+    const mobileChatQuery = window.matchMedia('(max-width: 768px)');
+
+    const resetMobileChatPosition = () => {
+        if (!mobileChatQuery.matches) return;
+        isDraggingChat = false;
+        didMoveChat = false;
+        container.style.left = 'auto';
+        container.style.top = 'auto';
+        container.style.right = '14px';
+        container.style.bottom = '14px';
+        container.style.width = '60px';
+        container.style.height = '60px';
+        container.style.touchAction = 'auto';
+        bubble.style.transform = 'none';
+    };
+
+    const closeChatPanel = () => {
+        panel.style.display = 'none';
+        bubble.innerHTML = '💬';
+        container.classList.remove('chat-open');
+        document.body.classList.remove('mobile-chat-open');
+        resetMobileChatPosition();
+    };
 
     const clampChatPosition = (left, top) => {
         const rect = container.getBoundingClientRect();
@@ -478,6 +501,7 @@ function initFloatingChatbot() {
     };
 
     bubble.addEventListener('pointerdown', (e) => {
+        if (mobileChatQuery.matches) return;
         if (panel.style.display !== 'none') return;
         isDraggingChat = true;
         didMoveChat = false;
@@ -495,6 +519,7 @@ function initFloatingChatbot() {
     });
 
     bubble.addEventListener('pointermove', (e) => {
+        if (mobileChatQuery.matches) return;
         if (!isDraggingChat) return;
         const moved = Math.abs(e.clientX - dragStartX) + Math.abs(e.clientY - dragStartY);
         if (moved > 6) didMoveChat = true;
@@ -505,6 +530,7 @@ function initFloatingChatbot() {
     });
 
     bubble.addEventListener('pointerup', (e) => {
+        if (mobileChatQuery.matches) return;
         if (!isDraggingChat) return;
         isDraggingChat = false;
         bubble.releasePointerCapture(e.pointerId);
@@ -516,16 +542,49 @@ function initFloatingChatbot() {
         }
     });
 
-    window.addEventListener('resize', () => {
+    bubble.addEventListener('pointercancel', () => {
+        isDraggingChat = false;
+        didMoveChat = false;
+        resetMobileChatPosition();
+    });
+
+    const handleChatViewportChange = () => {
+        if (mobileChatQuery.matches) {
+            resetMobileChatPosition();
+            if (panel.style.display !== 'none') {
+                document.body.classList.add('mobile-chat-open');
+            }
+            return;
+        }
+        document.body.classList.remove('mobile-chat-open');
+        if (panel.style.display !== 'none') {
+            positionChatPanel();
+            return;
+        }
         const rect = container.getBoundingClientRect();
         const pos = clampChatPosition(rect.left, rect.top);
         container.style.right = 'auto';
         container.style.bottom = 'auto';
         container.style.left = `${pos.left}px`;
         container.style.top = `${pos.top}px`;
-    });
+    };
+
+    window.addEventListener('resize', handleChatViewportChange);
+    window.visualViewport?.addEventListener('resize', handleChatViewportChange);
+    mobileChatQuery.addEventListener('change', handleChatViewportChange);
+    resetMobileChatPosition();
 
     const positionChatPanel = () => {
+        if (mobileChatQuery.matches) {
+            panel.style.inset = '0';
+            panel.style.width = '100vw';
+            panel.style.height = '100dvh';
+            return;
+        }
+
+        panel.style.inset = 'auto';
+        panel.style.width = '380px';
+        panel.style.height = '520px';
         const rect = container.getBoundingClientRect();
         const panelWidth = Math.min(380, window.innerWidth - 28);
         const panelHeight = Math.min(520, window.innerHeight - 110);
@@ -543,21 +602,24 @@ function initFloatingChatbot() {
             return;
         }
         if (panel.style.display === 'none') {
+            resetMobileChatPosition();
             positionChatPanel();
             panel.style.display = 'flex';
             bubble.innerHTML = '×';
+            container.classList.add('chat-open');
+            if (mobileChatQuery.matches) {
+                document.body.classList.add('mobile-chat-open');
+            }
             inputField.focus();
         } else {
-            panel.style.display = 'none';
-            bubble.innerHTML = '💬';
+            closeChatPanel();
         }
     };
 
     // Close Button Action
     panel.querySelector('#close-chat-btn').onclick = (e) => {
         e.stopPropagation();
-        panel.style.display = 'none';
-        bubble.innerHTML = '💬';
+        closeChatPanel();
     };
 
     if (chatHistory.length > 0) {
