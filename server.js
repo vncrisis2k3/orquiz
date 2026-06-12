@@ -1,15 +1,8 @@
-// Mock browser globals for pdf-parse in Node.js environment
-global.DOMMatrix = global.DOMMatrix || class DOMMatrix {};
-global.ImageData = global.ImageData || class ImageData {};
-global.Path2D = global.Path2D || class Path2D {};
-
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const pdf = require('pdf-parse');
-const mammoth = require('mammoth');
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const db = require('./db');
 require('dotenv').config();
@@ -26,6 +19,36 @@ app.use(express.json());
 app.use(express.static('public'));
 
 const upload = multer({ storage: multer.memoryStorage() });
+let pdfParser;
+let mammothParser;
+
+function getPdfParser() {
+    if (!pdfParser) {
+        // pdf-parse needs these browser-like globals in the Node.js runtime.
+        global.DOMMatrix = global.DOMMatrix || class DOMMatrix {};
+        global.ImageData = global.ImageData || class ImageData {};
+        global.Path2D = global.Path2D || class Path2D {};
+        pdfParser = require('pdf-parse').PDFParse;
+    }
+    return pdfParser;
+}
+
+async function parsePdfBuffer(buffer) {
+    const PDFParse = getPdfParser();
+    const parser = new PDFParse({ data: buffer });
+    try {
+        return await parser.getText();
+    } finally {
+        await parser.destroy();
+    }
+}
+
+function getMammothParser() {
+    if (!mammothParser) {
+        mammothParser = require('mammoth');
+    }
+    return mammothParser;
+}
 
 // Middleware to verify JWT
 const auth = (req, res, next) => {
@@ -879,10 +902,10 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
     
     try {
         if (req.file.mimetype === 'application/pdf') {
-            const data = await pdf(req.file.buffer);
+            const data = await parsePdfBuffer(req.file.buffer);
             text = data.text;
         } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+            const result = await getMammothParser().extractRawText({ buffer: req.file.buffer });
             text = result.value;
         } else {
             return res.status(400).send('Only PDF and DOCX are supported.');

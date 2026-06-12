@@ -608,6 +608,34 @@
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
         const errorMsg = document.getElementById('error-msg');
+        const AUTH_TIMEOUT_MS = 20000;
+
+        async function authFetch(path, options) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+
+            try {
+                return await fetch(`${API_URL}${path}`, {
+                    ...options,
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function setSubmitState(form, isSubmitting, pendingText) {
+            const button = form.querySelector('button[type="submit"]');
+            if (!button) return;
+
+            if (!button.dataset.defaultText) {
+                button.dataset.defaultText = button.textContent;
+            }
+            button.disabled = isSubmitting;
+            button.textContent = isSubmitting ? pendingText : button.dataset.defaultText;
+            button.style.opacity = isSubmitting ? '0.7' : '';
+            button.style.cursor = isSubmitting ? 'wait' : '';
+        }
 
         // Multi-step logic
         let currentStep = 1;
@@ -769,9 +797,11 @@
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
+            errorMsg.style.display = 'none';
+            setSubmitState(loginForm, true, 'Đang đăng nhập...');
 
             try {
-                const res = await fetch(`${API_URL}/login`, {
+                const res = await authFetch('/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -785,7 +815,11 @@
                     showError(data.msg);
                 }
             } catch (err) {
-                showError('Lỗi kết nối server');
+                showError(err.name === 'AbortError'
+                    ? 'Máy chủ phản hồi quá lâu. Vui lòng kiểm tra mạng và thử lại.'
+                    : 'Lỗi kết nối server');
+            } finally {
+                setSubmitState(loginForm, false);
             }
         });
 
@@ -819,8 +853,11 @@
                 formData.avatar_url = window.googleRegisterData.picture;
             }
 
+            errorMsg.style.display = 'none';
+            setSubmitState(registerForm, true, 'Đang tạo tài khoản...');
+
             try {
-                const res = await fetch(`${API_URL}/register`, {
+                const res = await authFetch('/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
@@ -834,7 +871,11 @@
                     showError(data.msg);
                 }
             } catch (err) {
-                showError('Lỗi kết nối server');
+                showError(err.name === 'AbortError'
+                    ? 'Máy chủ phản hồi quá lâu. Vui lòng kiểm tra mạng và thử lại.'
+                    : 'Lỗi kết nối server');
+            } finally {
+                setSubmitState(registerForm, false);
             }
         });
 
