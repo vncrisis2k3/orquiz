@@ -35,7 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('next-btn').addEventListener('click', nextQuestion);
     document.getElementById('prev-btn').addEventListener('click', prevQuestion);
-    initAntiExitGuard();
+    if (currentMode === 'exam') {
+        initAntiExitGuard();
+    }
 });
 
 function initAntiExitGuard() {
@@ -58,7 +60,7 @@ function initAntiExitGuard() {
 }
 
 function isQuizInProgress() {
-    return Boolean(currentQuiz && questions.length > 0 && !quizSubmitted);
+    return currentMode === 'exam' && Boolean(currentQuiz && questions.length > 0 && !quizSubmitted);
 }
 
 function registerPageExitAttempt(reason, fromBeforeUnload = false) {

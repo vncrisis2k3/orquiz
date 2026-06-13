@@ -1,7 +1,14 @@
 const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+const chatbotOnlyMode = Boolean(
+    document.querySelector('script[type="module"][src$="main.js"]')
+    && !document.querySelector('script:not([type="module"])[src$="main.js"]')
+);
 let currentGrade = 12; // Default to Grade 12
 
 document.addEventListener('DOMContentLoaded', async () => {
+    initFloatingChatbot();
+    if (chatbotOnlyMode) return;
+
     updateNavbar();
     await checkUserGrade();
     fetchSubjects();
@@ -80,6 +87,7 @@ function updateNavbar() {
     const navLinks = document.querySelector('.nav-links');
     const user = JSON.parse(localStorage.getItem('user'));
     const heroSection = document.getElementById('hero-section');
+    if (!navLinks) return;
     
     if (user) {
         if (heroSection) heroSection.style.display = 'none';
@@ -150,6 +158,7 @@ async function fetchLeaderboard() {
 
 async function fetchSubjects() {
     const subjectGrid = document.querySelector('.subject-grid');
+    if (!subjectGrid) return;
     
     try {
         const response = await fetch(`${API_URL}/subjects`);
@@ -177,8 +186,6 @@ async function fetchSubjects() {
             });
             window.refreshReveal();
             
-            // Build the global floating chatbot
-            initFloatingChatbot(subjects);
         }
     } catch (error) {
         console.error('Error fetching subjects:', error);
