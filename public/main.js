@@ -94,6 +94,7 @@ function updateNavbar() {
         navLinks.innerHTML = `
             <li><a href="index.html#subjects">Kiểm tra</a></li>
             <li><a href="practice.html">Luyện tập</a></li>
+            <li><a href="skill-tree.html">Bản đồ học tập</a></li>
             <li><a href="roadmap.html">Lộ trình</a></li>
             <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
             <li><a href="profile.html" class="btn btn-outline">Trang cá nhân</a></li>
@@ -109,6 +110,7 @@ function updateNavbar() {
         navLinks.innerHTML = `
             <li><a href="#subjects">Kiểm tra</a></li>
             <li><a href="practice.html">Luyện tập</a></li>
+            <li><a href="skill-tree.html">Bản đồ học tập</a></li>
             <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
             <li><a href="auth.html" class="btn btn-outline">Đăng nhập</a></li>
             <li><a href="auth.html" class="btn btn-primary">Bắt đầu ngay</a></li>
@@ -198,24 +200,8 @@ let selectedQuizMode = 'exam'; // Default to exam mode
 function checkAuthAndGo(subjectId, event) {
     if (event) event.preventDefault();
     if (localStorage.getItem('token')) {
-        selectedSubjectIdForModal = subjectId;
-        selectedQuizMode = 'exam';
-        
-        // Show the modal
-        const modal = document.getElementById('mode-select-modal');
-        if (modal) {
-            modal.style.display = 'flex';
-            modal.style.alignItems = 'flex-start';
-            modal.style.paddingTop = 'max(20px, calc(env(safe-area-inset-top) + 20px))';
-            modal.scrollTop = 0;
-            document.body.style.overflow = 'hidden';
-            const modalCard = modal.querySelector('.result-modal');
-            if (modalCard) modalCard.scrollIntoView({ block: 'start' });
-            updateModalOptionActiveState();
-        } else {
-            // Fallback if modal is not found for some reason
-            window.location.href = `quiz.html?subject=${subjectId}&grade=${currentGrade}`;
-        }
+        // Go to topic-based exam page
+        window.location.href = `exams.html?subject=${subjectId}&grade=${currentGrade}`;
     } else {
         alert('Vui lòng đăng nhập để thực hiện bài thi!');
         window.location.href = 'auth.html';
@@ -261,7 +247,7 @@ function closeModeSelectModal() {
 
 function startSelectedQuiz() {
     if (selectedSubjectIdForModal) {
-        window.location.href = `quiz.html?subject=${selectedSubjectIdForModal}&grade=${currentGrade}&mode=${selectedQuizMode}`;
+        window.location.href = `exams.html?subject=${selectedSubjectIdForModal}&grade=${currentGrade}`;
     }
 }
 

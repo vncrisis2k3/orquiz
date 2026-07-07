@@ -54,9 +54,14 @@ CREATE TABLE IF NOT EXISTS questions (
     option_c TEXT NOT NULL,
     option_d TEXT NOT NULL,
     correct_option CHAR(1) CHECK (correct_option IN ('A', 'B', 'C', 'D')),
+    question_type VARCHAR(30) NOT NULL DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice', 'fill_blank')),
+    correct_answer TEXT,
     explanation TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS question_type VARCHAR(30) NOT NULL DEFAULT 'multiple_choice';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS correct_answer TEXT;
 
 -- 5. Results Table
 CREATE TABLE IF NOT EXISTS results (

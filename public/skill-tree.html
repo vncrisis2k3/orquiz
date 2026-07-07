@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bản đồ học tập - EduFlow</title>
+    <meta name="description" content="Bản đồ học tập theo môn học với các trạm kiến thức được mở khóa tuần tự.">
+    <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
+    <style>
+        :root {
+            --tree-green: #22c55e;
+            --tree-green-dark: #16a34a;
+            --tree-blue: #3b82f6;
+            --tree-locked: #94a3b8;
+        }
+
+        body { background: #f4f7fb; }
+        .practice-header {
+            padding: 58px 0 84px;
+            color: white;
+            text-align: center;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(255,255,255,.22), transparent 25%),
+                radial-gradient(circle at 85% 65%, rgba(255,255,255,.12), transparent 30%),
+                linear-gradient(135deg, #ff8a00, #f97316);
+            border-radius: 0 0 48px 48px;
+            box-shadow: 0 22px 55px rgba(249, 115, 22, .2);
+        }
+        .practice-header h1 { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 12px; }
+        .practice-header p { max-width: 680px; margin: auto; opacity: .94; line-height: 1.7; }
+        .practice-container { padding: 0 0 90px; margin-top: -38px; position: relative; }
+
+        .intro-card, .tree-summary, .tree-map-shell {
+            background: white;
+            border: 1px solid #e8edf4;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, .07);
+        }
+        .intro-card {
+            border-radius: 26px;
+            padding: 28px 32px;
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            margin-bottom: 42px;
+        }
+        .intro-icon {
+            width: 70px; height: 70px; flex: 0 0 70px;
+            display: grid; place-items: center;
+            border-radius: 22px;
+            background: #fff7ed;
+            font-size: 34px;
+        }
+        .intro-card h2 { font-size: 1.35rem; color: var(--secondary); margin-bottom: 6px; }
+        .intro-card p { color: var(--text-gray); line-height: 1.65; }
+
+        .subject-heading { text-align: center; margin-bottom: 30px; }
+        .subject-heading h2 { font-size: 2rem; color: var(--secondary); margin-bottom: 9px; }
+        .subject-heading p { color: var(--text-gray); }
+        .grade-selector { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+        .subject-card { cursor: pointer; }
+        .subject-card .link { pointer-events: none; }
+
+        .tree-toolbar { margin-bottom: 18px; }
+        .btn-back {
+            border: 1px solid #dbe3ed; background: white; color: #334155;
+            border-radius: 13px; padding: 10px 17px; cursor: pointer; font-weight: 700;
+            box-shadow: 0 7px 20px rgba(15, 23, 42, .05);
+        }
+        .tree-summary {
+            border-radius: 28px;
+            padding: 28px 32px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 24px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .tree-subject-icon {
+            width: 78px; height: 78px;
+            display: grid; place-items: center;
+            border-radius: 24px;
+            font-size: 38px;
+            background: linear-gradient(145deg, #fff7ed, #ffedd5);
+        }
+        .tree-summary h2 { color: var(--secondary); font-size: 1.75rem; margin-bottom: 5px; }
+        .tree-summary p { color: var(--text-gray); }
+        .progress-copy { text-align: right; min-width: 145px; }
+        .progress-copy strong { display: block; color: var(--tree-green-dark); font-size: 1.55rem; }
+        .progress-copy span { color: var(--text-gray); font-size: .86rem; }
+        .progress-track {
+            grid-column: 1 / -1;
+            height: 12px; background: #e8edf4; border-radius: 999px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; width: 0;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--tree-green), #84cc16);
+            transition: width .7s ease;
+        }
+        .tree-legend {
+            display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;
+            color: #64748b; font-size: .86rem; margin: 20px 0;
+        }
+        .legend-dot { width: 11px; height: 11px; display: inline-block; border-radius: 50%; margin-right: 6px; }
+
+        .tree-map-shell {
+            border-radius: 34px;
+            padding: 38px 22px 54px;
+            overflow: hidden;
+            position: relative;
+            background:
+                radial-gradient(circle at 12% 10%, rgba(34,197,94,.06), transparent 22%),
+                radial-gradient(circle at 88% 55%, rgba(59,130,246,.06), transparent 26%),
+                white;
+        }
+        .skill-map { position: relative; max-width: 850px; min-height: 220px; margin: 0 auto; }
+        .skill-path-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+        .skill-node-row {
+            height: 174px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; z-index: 1;
+        }
+        .skill-station {
+            display: flex; align-items: center; gap: 18px;
+            transition: transform .3s ease;
+        }
+        .skill-node-row.bend-left .skill-station { transform: translateX(-175px); }
+        .skill-node-row.bend-right .skill-station { transform: translateX(175px); flex-direction: row-reverse; text-align: right; }
+        .skill-node-row.center .skill-station { transform: translateX(0); }
+
+        .skill-node {
+            width: 94px; height: 94px; flex: 0 0 94px;
+            display: grid; place-items: center;
+            border-radius: 50%; border: 0;
+            position: relative; cursor: pointer;
+            font-size: 34px; color: white;
+            box-shadow: 0 9px 0 rgba(15,23,42,.14), 0 16px 30px rgba(15,23,42,.15);
+            transition: transform .2s ease, filter .2s ease;
+        }
+        .skill-node:hover:not(:disabled) { transform: translateY(-4px) scale(1.04); }
+        .skill-node.completed { background: linear-gradient(145deg, #4ade80, #16a34a); }
+        .skill-node.current { background: linear-gradient(145deg, #60a5fa, #2563eb); animation: nodePulse 2s infinite; }
+        .skill-node.locked { background: linear-gradient(145deg, #cbd5e1, #94a3b8); filter: grayscale(.3); cursor: not-allowed; }
+        .skill-node.unavailable { background: linear-gradient(145deg, #e2e8f0, #b8c3d1); cursor: default; }
+        .skill-node.completed::after {
+            content: ''; position: absolute; inset: -8px; border: 3px solid rgba(34,197,94,.2); border-radius: 50%;
+        }
+        @keyframes nodePulse {
+            0%, 100% { box-shadow: 0 9px 0 rgba(30,64,175,.25), 0 16px 35px rgba(37,99,235,.24); }
+            50% { box-shadow: 0 9px 0 rgba(30,64,175,.25), 0 16px 42px rgba(37,99,235,.48), 0 0 0 12px rgba(59,130,246,.08); }
+        }
+        .node-number {
+            position: absolute; top: -5px; right: -5px;
+            width: 28px; height: 28px; display: grid; place-items: center;
+            border-radius: 50%; background: #172033; color: white;
+            font-size: 12px; font-weight: 800; border: 3px solid white;
+        }
+        .skill-node-info { width: 235px; }
+        .skill-node-info h3 { color: #1e293b; font-size: 1.05rem; line-height: 1.3; margin-bottom: 6px; }
+        .skill-node-info p { color: #64748b; font-size: .82rem; line-height: 1.45; }
+        .node-status {
+            display: inline-flex; margin-top: 8px; border-radius: 999px; padding: 4px 9px;
+            font-size: .72rem; font-weight: 800;
+        }
+        .node-status.completed { color: #15803d; background: #dcfce7; }
+        .node-status.current { color: #1d4ed8; background: #dbeafe; }
+        .node-status.locked, .node-status.unavailable { color: #64748b; background: #f1f5f9; }
+        .tree-empty, .tree-loading { text-align: center; padding: 70px 20px; color: #64748b; }
+        .tree-empty span, .tree-loading span { display: block; font-size: 50px; margin-bottom: 15px; }
+        .tree-toast {
+            position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 30px);
+            opacity: 0; z-index: 9999; color: white; background: #172033;
+            padding: 13px 20px; border-radius: 14px; box-shadow: 0 15px 35px rgba(15,23,42,.25);
+            transition: .25s ease; pointer-events: none; text-align: center;
+        }
+        .tree-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+        [data-theme="dark"] body { background: #0b1120; }
+        [data-theme="dark"] .intro-card, [data-theme="dark"] .tree-summary, [data-theme="dark"] .tree-map-shell { background: #172033; border-color: #2d3b50; }
+        [data-theme="dark"] .intro-card h2, [data-theme="dark"] .subject-heading h2, [data-theme="dark"] .tree-summary h2, [data-theme="dark"] .skill-node-info h3 { color: #f8fafc; }
+        [data-theme="dark"] .intro-card p, [data-theme="dark"] .subject-heading p, [data-theme="dark"] .tree-summary p, [data-theme="dark"] .skill-node-info p { color: #a8b3c5; }
+
+        @media (max-width: 768px) {
+            .practice-header { padding: 42px 18px 70px; border-radius: 0 0 32px 32px; }
+            .practice-container { margin-top: -28px; }
+            .intro-card { padding: 22px 18px; align-items: flex-start; }
+            .tree-summary { grid-template-columns: auto 1fr; padding: 22px 18px; gap: 15px; }
+            .tree-subject-icon { width: 62px; height: 62px; font-size: 30px; }
+            .tree-summary h2 { font-size: 1.3rem; }
+            .progress-copy { grid-column: 1 / -1; text-align: left; }
+            .progress-track { grid-column: 1 / -1; }
+            .tree-map-shell { padding: 26px 8px 42px; border-radius: 25px; }
+            .skill-node-row { height: 168px; }
+            .skill-node-row.bend-left .skill-station { transform: translateX(-72px); }
+            .skill-node-row.bend-right .skill-station { transform: translateX(72px); }
+            .skill-node { width: 76px; height: 76px; flex-basis: 76px; font-size: 27px; }
+            .skill-node-info { width: 155px; }
+            .skill-node-info h3 { font-size: .92rem; }
+            .skill-node-info p { font-size: .75rem; }
+        }
+        @media (max-width: 430px) {
+            .skill-node-row.bend-left .skill-station { transform: translateX(-35px); }
+            .skill-node-row.bend-right .skill-station { transform: translateX(35px); }
+            .skill-node-info { width: 135px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <ul class="nav-links" id="nav-links"></ul>
+        </div>
+    </nav>
+
+    <header class="practice-header">
+        <div class="container">
+            <h1>🗺️ Bản đồ học tập</h1>
+            <p>Chinh phục từng trạm kiến thức, vượt qua thử thách và mở khóa chặng đường tiếp theo của bạn.</p>
+        </div>
+    </header>
+
+    <main class="container practice-container">
+        <div id="subjects-view">
+            <div class="intro-card">
+                <div class="intro-icon">🏁</div>
+                <div>
+                    <h2>Học theo lộ trình, tiến bộ từng bước</h2>
+                    <p>Bạn cần đạt ít nhất 5 điểm ở một trạm để mở khóa trạm tiếp theo. Có thể luyện lại các trạm đã hoàn thành bất cứ lúc nào.</p>
+                </div>
+            </div>
+
+            <div class="subject-heading">
+                <h2>Chọn hành trình của bạn</h2>
+                <p>Mỗi môn học là một con đường kiến thức riêng.</p>
+                <div class="grade-selector">
+                    <button class="btn btn-outline grade-btn" data-grade="10" onclick="selectGrade(10)">Lớp 10</button>
+                    <button class="btn btn-outline grade-btn" data-grade="11" onclick="selectGrade(11)">Lớp 11</button>
+                    <button class="btn btn-primary grade-btn" data-grade="12" onclick="selectGrade(12)">Lớp 12</button>
+                </div>
+            </div>
+
+            <div class="subject-grid" id="subject-grid">
+                <div style="grid-column: 1/-1; text-align:center; padding:45px; color:var(--text-gray);">Đang tải danh sách môn học...</div>
+            </div>
+        </div>
+
+        <div id="tree-view" style="display:none;">
+            <div class="tree-toolbar"><button class="btn-back" onclick="showSubjectsView()">← Chọn môn khác</button></div>
+            <section class="tree-summary">
+                <div class="tree-subject-icon" id="tree-subject-icon">📚</div>
+                <div>
+                    <h2 id="tree-title">Bản đồ môn học</h2>
+                    <p id="tree-subtitle">Hoàn thành từng trạm để tiếp tục hành trình.</p>
+                </div>
+                <div class="progress-copy">
+                    <strong id="tree-progress-count">0/0 trạm</strong>
+                    <span id="tree-progress-label">0% hoàn thành</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill" id="tree-progress-fill"></div></div>
+            </section>
+
+            <div class="tree-legend">
+                <span><i class="legend-dot" style="background:#22c55e"></i>Đã hoàn thành</span>
+                <span><i class="legend-dot" style="background:#3b82f6"></i>Đang mở</span>
+                <span><i class="legend-dot" style="background:#94a3b8"></i>Chưa mở khóa</span>
+            </div>
+
+            <section class="tree-map-shell">
+                <div class="skill-map" id="skill-map">
+                    <div class="tree-loading"><span>🧭</span>Đang dựng bản đồ học tập...</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div class="tree-toast" id="tree-toast"></div>
+
+    <footer class="footer">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <p>&copy; 2026 EduFlow. Học từng bước, vững từng chặng.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:')
+            ? 'http://localhost:5000/api' : '/api';
+        let currentGrade = 12;
+        let subjects = [];
+        let currentTree = null;
+        let currentSubject = null;
+        let toastTimer = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!localStorage.getItem('token')) {
+                location.href = 'auth.html';
+                return;
+            }
+
+            updateNavbar();
+            await loadUserGrade();
+
+            const params = new URLSearchParams(location.search);
+            const urlGrade = Number(params.get('grade'));
+            if ([10, 11, 12].includes(urlGrade)) currentGrade = urlGrade;
+            updateGradeButtons();
+            await loadSubjects();
+
+            const subjectId = Number(params.get('subject'));
+            if (subjectId) {
+                const subject = subjects.find(item => Number(item.id) === subjectId);
+                if (subject) await openSkillTree(subject.id, subject.name, subject.slug, false);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (currentTree) drawConnectors();
+        });
+
+        function updateNavbar() {
+            const user = JSON.parse(localStorage.getItem('user') || 'null');
+            document.getElementById('nav-links').innerHTML = user ? `
+                <li><a href="index.html#subjects">Kiểm tra</a></li>
+                <li><a href="practice.html">Luyện tập</a></li>
+                <li><a href="skill-tree.html" style="color:var(--primary);font-weight:800;">Bản đồ học tập</a></li>
+                <li><a href="roadmap.html">Lộ trình AI</a></li>
+                <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
+                <li><a href="profile.html" class="btn btn-outline" style="padding:8px 16px;">Trang cá nhân</a></li>
+                <li><a href="#" onclick="logout();return false;" class="btn btn-primary" style="padding:8px 16px;">Đăng xuất</a></li>
+            ` : '';
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            location.href = 'index.html';
+        }
+
+        async function loadUserGrade() {
+            try {
+                const response = await fetch(`${API_URL}/auth/user`, {
+                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                });
+                if (!response.ok) return;
+                const user = await response.json();
+                const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : user.survey_data;
+                const grade = Number(survey?.grade);
+                if ([10, 11, 12].includes(grade)) currentGrade = grade;
+            } catch (error) {
+                console.error('Không thể tải lớp của người dùng:', error);
+            }
+        }
+
+        async function loadSubjects() {
+            const grid = document.getElementById('subject-grid');
+            try {
+                const response = await fetch(`${API_URL}/subjects`);
+                const data = await response.json();
+                if (!response.ok || !Array.isArray(data)) throw new Error(data.msg || 'Không thể tải môn học.');
+                subjects = data;
+                grid.innerHTML = data.map((subject, index) => {
+                    const icon = getSubjectIcon(subject.slug);
+                    return `
+                        <article class="subject-card stagger-reveal active" style="transition-delay:${index * .05}s" onclick="openSkillTreeById(${subject.id})">
+                            <div class="subject-icon ${icon.color}">${icon.emoji}</div>
+                            <h3>${escapeHtml(subject.name)}</h3>
+                            <p>Khám phá bản đồ kiến thức ${escapeHtml(subject.name)} lớp ${currentGrade}</p>
+                            <span class="link">Bắt đầu hành trình →</span>
+                        </article>`;
+                }).join('');
+            } catch (error) {
+                grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--danger);">${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function selectGrade(grade) {
+            currentGrade = grade;
+            updateGradeButtons();
+            loadSubjects();
+        }
+
+        function updateGradeButtons() {
+            document.querySelectorAll('.grade-btn').forEach(button => {
+                const active = Number(button.dataset.grade) === currentGrade;
+                button.classList.toggle('btn-primary', active);
+                button.classList.toggle('btn-outline', !active);
+            });
+        }
+
+        function openSkillTreeById(subjectId) {
+            const subject = subjects.find(item => Number(item.id) === Number(subjectId));
+            if (subject) openSkillTree(subject.id, subject.name, subject.slug);
+        }
+
+        async function openSkillTree(subjectId, subjectName, slug, updateUrl = true) {
+            currentSubject = { id: Number(subjectId), name: subjectName, slug };
+            document.getElementById('subjects-view').style.display = 'none';
+            document.getElementById('tree-view').style.display = 'block';
+            document.getElementById('tree-title').textContent = `${subjectName} · Lớp ${currentGrade}`;
+            document.getElementById('tree-subject-icon').textContent = getSubjectIcon(slug).emoji;
+            document.getElementById('skill-map').innerHTML = '<div class="tree-loading"><span>🧭</span>Đang dựng bản đồ học tập...</div>';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (updateUrl) history.pushState({}, '', `skill-tree.html?subject=${subjectId}&grade=${currentGrade}`);
+
+            try {
+                const response = await fetch(`${API_URL}/skill-tree?subject_id=${subjectId}&grade=${currentGrade}`, {
+                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                });
+                const data = await response.json();
+                if (response.status === 401) {
+                    location.href = 'auth.html';
+                    return;
+                }
+                if (!response.ok) throw new Error(data.msg || 'Không thể tải bản đồ học tập.');
+                currentTree = data;
+                renderTree(data);
+            } catch (error) {
+                currentTree = null;
+                document.getElementById('skill-map').innerHTML = `<div class="tree-empty"><span>⚠️</span>${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function renderTree(tree) {
+            document.getElementById('tree-progress-count').textContent = `${tree.completed}/${tree.total} trạm`;
+            document.getElementById('tree-progress-label').textContent = `${tree.progress_percent}% hoàn thành`;
+            document.getElementById('tree-progress-fill').style.width = `${tree.progress_percent}%`;
+            document.getElementById('tree-subtitle').textContent = `Đạt từ ${tree.pass_score}/10 để mở khóa trạm kế tiếp.`;
+
+            const map = document.getElementById('skill-map');
+            if (!tree.nodes.length) {
+                map.innerHTML = '<div class="tree-empty"><span>🌱</span><h3>Chưa có trạm học tập</h3><p>Nội dung môn học này đang được cập nhật.</p></div>';
+                return;
+            }
+
+            const positions = ['bend-left', 'center', 'bend-right', 'center'];
+            map.innerHTML = `<svg class="skill-path-lines" id="skill-path-lines" aria-hidden="true"></svg>` + tree.nodes.map((node, index) => {
+                const statusText = {
+                    completed: `Đã hoàn thành · ${Number(node.best_score).toFixed(1)} điểm`,
+                    current: node.attempts ? `Thử lại · Cao nhất ${Number(node.best_score).toFixed(1)}` : 'Sẵn sàng học',
+                    locked: 'Cần hoàn thành trạm trước',
+                    unavailable: 'Nội dung đang cập nhật'
+                }[node.status];
+                const icon = { completed: '✓', current: '▶', locked: '🔒', unavailable: '🛠️' }[node.status];
+                const detail = node.quiz_title
+                    ? `${node.quiz_title} · ${node.question_count} câu`
+                    : (node.unavailable ? 'Cần một bài có tối thiểu 10 câu để mở trạm.' : 'Bài luyện tập');
+                return `
+                    <div class="skill-node-row ${positions[index % positions.length]}" data-index="${index}">
+                        <div class="skill-station">
+                            <button class="skill-node ${node.status}" onclick="openSkillNode(${index})" ${node.unavailable ? 'disabled' : ''} aria-label="${escapeHtml(node.title)}">
+                                <span>${icon}</span><span class="node-number">${index + 1}</span>
+                            </button>
+                            <div class="skill-node-info">
+                                <h3>${escapeHtml(node.title)}</h3>
+                                <p>${escapeHtml(detail)}</p>
+                                <span class="node-status ${node.status}">${escapeHtml(statusText)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            requestAnimationFrame(drawConnectors);
+        }
+
+        function drawConnectors() {
+            const map = document.getElementById('skill-map');
+            const svg = document.getElementById('skill-path-lines');
+            if (!map || !svg || !currentTree) return;
+            const mapRect = map.getBoundingClientRect();
+            const buttons = [...map.querySelectorAll('.skill-node')];
+            svg.setAttribute('viewBox', `0 0 ${mapRect.width} ${mapRect.height}`);
+            svg.innerHTML = buttons.slice(0, -1).map((button, index) => {
+                const next = buttons[index + 1];
+                const a = button.getBoundingClientRect();
+                const b = next.getBoundingClientRect();
+                const x1 = a.left - mapRect.left + a.width / 2;
+                const y1 = a.top - mapRect.top + a.height / 2;
+                const x2 = b.left - mapRect.left + b.width / 2;
+                const y2 = b.top - mapRect.top + b.height / 2;
+                const midY = (y1 + y2) / 2;
+                const completed = currentTree.nodes[index].status === 'completed';
+                return `<path d="M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}" fill="none" stroke="${completed ? '#4ade80' : '#cbd5e1'}" stroke-width="8" stroke-linecap="round" ${completed ? '' : 'stroke-dasharray="10 12"'} />`;
+            }).join('');
+        }
+
+        function openSkillNode(index) {
+            const node = currentTree?.nodes[index];
+            if (!node) return;
+            if (node.status === 'unavailable') {
+                showToast('🛠️ Chủ đề này chưa có bài luyện tập.');
+                return;
+            }
+            if (!node.unlocked) {
+                showToast(`🔒 Hãy đạt ít nhất ${currentTree.pass_score} điểm ở trạm trước để mở khóa.`);
+                return;
+            }
+            location.href = `quiz.html?id=${node.quiz_id}&mode=practice&subject=${currentSubject.id}&grade=${currentGrade}&source=skill-tree`;
+        }
+
+        function showSubjectsView() {
+            currentTree = null;
+            currentSubject = null;
+            document.getElementById('tree-view').style.display = 'none';
+            document.getElementById('subjects-view').style.display = 'block';
+            history.pushState({}, '', 'skill-tree.html');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('tree-toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+        }
+
+        function getSubjectIcon(slug) {
+            return ({
+                toan: { emoji: '📐', color: 'orange' }, ly: { emoji: '⚡', color: 'red' },
+                hoa: { emoji: '🧪', color: 'yellow' }, sinh: { emoji: '🧬', color: 'green' },
+                su: { emoji: '📜', color: 'blue' }, dia: { emoji: '🌍', color: 'purple' },
+                van: { emoji: '🖋️', color: 'brown' }, tin: { emoji: '💻', color: 'cyan' },
+                anh: { emoji: '🔤', color: 'red' }
+            })[slug] || { emoji: '📚', color: 'orange' };
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>

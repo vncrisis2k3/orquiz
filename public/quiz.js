@@ -8,7 +8,13 @@ let userAnswers = {};
 let timeLeft = 0;
 let timerInterval = null;
 let currentMode = 'exam'; // 'exam' or 'practice'
+let currentSource = null;
 let quizSubmitted = false;
+let answeredQuestions = new Set();
+let skillCorrectCount = 0;
+let instantFeedbackTimer = null;
+const questionHints = {};
+const hintRequestsInFlight = new Set();
 let pageExitWarnings = 0;
 let lastExitWarningAt = 0;
 const MAX_PAGE_EXIT_WARNINGS = 3;
@@ -24,10 +30,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentSubjectId = subjectId;
     currentGrade = grade;
     currentMode = urlParams.get('mode') || 'exam';
+    currentSource = urlParams.get('source');
     const quizId = urlParams.get('id');
 
     if (quizId) {
-        loadQuiz(quizId);
+        if (currentMode === 'practice' && currentSource === 'skill-tree') {
+            const canOpen = await ensureSkillTreeAccess(quizId);
+            if (!canOpen) return;
+            const anotherButton = document.getElementById('another-quiz-btn');
+            if (anotherButton) anotherButton.textContent = 'Về bản đồ học tập';
+        }
+        await loadQuiz(quizId);
     } else if (subjectId) {
         // Find a random quiz for this subject and grade
         loadRandomQuiz(subjectId, null, grade);
@@ -39,6 +52,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         initAntiExitGuard();
     }
 });
+
+async function ensureSkillTreeAccess(quizId) {
+    try {
+        const response = await fetch(`${API_URL}/skill-tree/access/${quizId}`, {
+            headers: { 'x-auth-token': localStorage.getItem('token') }
+        });
+        const data = await response.json();
+        if (response.status === 401) {
+            window.location.href = 'auth.html';
+            return false;
+        }
+        if (!response.ok) throw new Error(data.msg || 'Không thể kiểm tra trạm học tập.');
+
+        currentSubjectId = currentSubjectId || data.subject_id;
+        currentGrade = currentGrade || data.grade;
+        if (!data.unlocked) {
+            alert(data.msg || 'Trạm học tập này chưa được mở khóa.');
+            window.location.href = `skill-tree.html?subject=${data.subject_id}&grade=${data.grade}`;
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Skill tree access error:', error);
+        alert(error.message);
+        window.location.href = 'skill-tree.html';
+        return false;
+    }
+}
 
 function initAntiExitGuard() {
     window.addEventListener('beforeunload', (event) => {
@@ -93,10 +134,28 @@ function registerPageExitAttempt(reason, fromBeforeUnload = false) {
 async function loadQuiz(id) {
     try {
         const response = await fetch(`${API_URL}/quiz/${id}`);
+        if (!response.ok) throw new Error('Không thể tải bài học.');
         currentQuiz = await response.json();
-        questions = currentQuiz.questions;
+        questions = Array.isArray(currentQuiz.questions) ? currentQuiz.questions : [];
+        answeredQuestions = new Set();
+        skillCorrectCount = 0;
+
+        if (isBiteSizedLesson()) {
+            document.body.classList.add('bite-sized-lesson');
+            questions = questions.slice(0, 15);
+            const progressLabel = document.getElementById('skill-progress-label');
+            if (progressLabel) {
+                progressLabel.style.display = 'block';
+                progressLabel.textContent = `Đã làm đúng 0/${questions.length} câu`;
+            }
+            updateBiteSizedProgress();
+        }
+
+        if (questions.length === 0) throw new Error('Bài học chưa có câu hỏi.');
         
-        document.getElementById('quiz-title').textContent = currentQuiz.title;
+        document.getElementById('quiz-title').textContent = isBiteSizedLesson()
+            ? `${currentQuiz.title} · ${questions.length} câu`
+            : currentQuiz.title;
         
         const timerEl = document.getElementById('timer');
         if (currentMode === 'practice') {
@@ -120,27 +179,37 @@ async function loadQuiz(id) {
     }
 }
 
+function isBiteSizedLesson() {
+    return currentMode === 'practice' && currentSource === 'skill-tree';
+}
+
 function renderQuestion() {
     const container = document.getElementById('quiz-container');
     const question = questions[currentQuestionIndex];
+    const answered = answeredQuestions.has(currentQuestionIndex);
     
     // Update progress bar
-    const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-    document.getElementById('progress-bar').style.width = `${progress}%`;
+    if (isBiteSizedLesson()) {
+        updateBiteSizedProgress();
+    } else {
+        const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+    }
 
     container.innerHTML = `
         <div class="question-card">
-            <span class="question-meta">Câu hỏi ${currentQuestionIndex + 1} / ${questions.length}</span>
+            <span class="question-meta">${isBiteSizedLesson() ? 'Miếng kiến thức' : 'Câu hỏi'} ${currentQuestionIndex + 1} / ${questions.length}</span>
             <p class="question-text">${autoWrapMath(question.content)}</p>
-            <div class="options-grid">
+            ${question.question_type === 'fill_blank' ? renderFillBlankInput(question, answered) : `<div class="options-grid">
                 ${['A', 'B', 'C', 'D'].map(opt => `
-                    <button class="option-btn ${userAnswers[currentQuestionIndex] === opt ? 'selected' : ''}" 
-                            onclick="selectOption('${opt}')">
+                    <button class="option-btn ${getOptionStateClass(opt, question, answered)}"
+                            onclick="selectOption('${opt}')" ${answered ? 'disabled' : ''}>
                         <span class="option-prefix">${opt}</span>
                         ${autoWrapMath(question[`option_${opt.toLowerCase()}`])}
                     </button>
                 `).join('')}
-            </div>
+            </div>`}
+            ${renderQuestionHint(question)}
         </div>
     `;
 
@@ -161,15 +230,234 @@ function renderQuestion() {
     document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
     document.getElementById('next-btn').textContent = 
         currentQuestionIndex === questions.length - 1 ? 'Nộp bài' : 'Câu sau';
+    document.getElementById('next-btn').disabled = !answered;
+}
+
+function renderQuestionHint(question) {
+    const cachedHint = questionHints[question.id];
+    const loading = hintRequestsInFlight.has(question.id);
+    return `
+        <div class="question-hint-tools">
+            <button type="button" class="ask-ai-hint-btn" id="ask-ai-hint-btn" onclick="requestAiHint()" ${loading ? 'disabled' : ''}>
+                <span>${loading ? '⏳' : '✨'}</span> ${loading ? 'AI đang suy nghĩ...' : (cachedHint ? 'Xem lại gợi ý' : 'Hỏi AI')}
+            </button>
+            <div class="ai-hint-card ${cachedHint ? 'show' : ''}" id="ai-hint-card">
+                <div class="ai-hint-heading"><span>🤖</span><strong>Gợi ý từ EduBot</strong></div>
+                <div class="ai-hint-content" id="ai-hint-content">${cachedHint ? autoWrapMath(escapeAttribute(cachedHint)) : ''}</div>
+                <div class="ai-hint-warning">Gợi ý chỉ mở hướng suy nghĩ, không đưa đáp án cuối cùng.</div>
+            </div>
+        </div>`;
+}
+
+async function requestAiHint() {
+    const question = questions[currentQuestionIndex];
+    if (!question || hintRequestsInFlight.has(question.id)) return;
+
+    const card = document.getElementById('ai-hint-card');
+    if (questionHints[question.id]) {
+        card?.classList.toggle('show');
+        return;
+    }
+
+    const button = document.getElementById('ask-ai-hint-btn');
+    const content = document.getElementById('ai-hint-content');
+    hintRequestsInFlight.add(question.id);
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span>⏳</span> AI đang suy nghĩ...';
+    }
+    if (card) card.classList.add('show', 'loading');
+    if (content) content.textContent = 'Mình đang tìm một gợi ý vừa đủ cho bạn...';
+
+    try {
+        const response = await fetch(`${API_URL}/ai/hint`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': localStorage.getItem('token')
+            },
+            body: JSON.stringify({ question_id: question.id })
+        });
+        const data = await response.json();
+        if (response.status === 401) {
+            window.location.href = 'auth.html';
+            return;
+        }
+        if (!response.ok || !data.hint) throw new Error(data.msg || 'AI chưa thể tạo gợi ý.');
+
+        questionHints[question.id] = data.hint;
+        const activeCard = questions[currentQuestionIndex]?.id === question.id ? document.getElementById('ai-hint-card') : card;
+        const activeContent = questions[currentQuestionIndex]?.id === question.id ? document.getElementById('ai-hint-content') : content;
+        if (activeContent) activeContent.innerHTML = autoWrapMath(escapeAttribute(data.hint));
+        if (activeCard) activeCard.classList.add('show');
+        if (activeCard) activeCard.classList.remove('loading');
+        if (typeof renderMathInElement === 'function' && activeCard) {
+            renderMathInElement(activeCard, {
+                delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+                throwOnError: false
+            });
+        }
+    } catch (error) {
+        const activeCard = questions[currentQuestionIndex]?.id === question.id ? document.getElementById('ai-hint-card') : card;
+        const activeContent = questions[currentQuestionIndex]?.id === question.id ? document.getElementById('ai-hint-content') : content;
+        if (activeContent) activeContent.textContent = error.message;
+        if (activeCard) activeCard.classList.remove('loading');
+    } finally {
+        hintRequestsInFlight.delete(question.id);
+        const activeButton = questions[currentQuestionIndex]?.id === question.id ? document.getElementById('ask-ai-hint-btn') : button;
+        if (activeButton) {
+            activeButton.disabled = false;
+            activeButton.innerHTML = `<span>✨</span> ${questionHints[question.id] ? 'Xem lại gợi ý' : 'Thử hỏi lại AI'}`;
+        }
+    }
+}
+
+function renderFillBlankInput(question, answered) {
+    const currentValue = userAnswers[currentQuestionIndex] ?? '';
+    let stateClass = '';
+    if (answered) stateClass = isQuestionAnswerCorrect(question, currentValue) ? 'correct' : 'wrong';
+    return `
+        <div class="fill-blank-wrap ${stateClass}">
+            <label for="fill-answer-${currentQuestionIndex}">Nhập kết quả số cuối cùng</label>
+            <div class="fill-blank-row">
+                <input id="fill-answer-${currentQuestionIndex}" class="fill-blank-input" type="text" inputmode="decimal"
+                    placeholder="Ví dụ: 12.5" value="${escapeAttribute(currentValue)}"
+                    oninput="updateFillBlankAnswer(this.value)"
+                    onkeydown="if(event.key === 'Enter') submitFillBlankAnswer()"
+                    ${answered ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary fill-check-btn" onclick="submitFillBlankAnswer()" ${answered ? 'disabled' : ''}>Kiểm tra</button>
+            </div>
+            ${answered ? `<div class="fill-answer-feedback">${stateClass === 'correct' ? '✓ Chính xác!' : `✕ Đáp án đúng: ${escapeAttribute(question.correct_answer)}`}</div>` : ''}
+        </div>`;
+}
+
+function updateFillBlankAnswer(value) {
+    if (answeredQuestions.has(currentQuestionIndex)) return;
+    userAnswers[currentQuestionIndex] = value;
+}
+
+function submitFillBlankAnswer() {
+    if (answeredQuestions.has(currentQuestionIndex)) return;
+    const question = questions[currentQuestionIndex];
+    const answer = String(userAnswers[currentQuestionIndex] ?? '').trim();
+    if (!answer || !Number.isFinite(Number(answer.replace(',', '.')))) {
+        showInstantAiFeedback(false, question.correct_answer, 'Hãy nhập một kết quả số hợp lệ trước nhé.');
+        return;
+    }
+    const isCorrect = isQuestionAnswerCorrect(question, answer);
+    answeredQuestions.add(currentQuestionIndex);
+    if (isCorrect && isBiteSizedLesson()) skillCorrectCount++;
+    playAnswerSound(isCorrect);
+    showInstantAiFeedback(isCorrect, question.correct_answer);
+    renderQuestion();
+}
+
+function isQuestionAnswerCorrect(question, answer) {
+    if (question.question_type !== 'fill_blank') return answer === question.correct_option;
+    const expected = Number(String(question.correct_answer ?? '').trim().replace(',', '.'));
+    const actual = Number(String(answer ?? '').trim().replace(',', '.'));
+    if (!Number.isFinite(expected) || !Number.isFinite(actual)) return false;
+    const tolerance = Math.max(1e-6, Math.abs(expected) * 1e-4);
+    return Math.abs(actual - expected) <= tolerance;
+}
+
+function escapeAttribute(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function getOptionStateClass(option, question, answered) {
+    const selected = userAnswers[currentQuestionIndex] === option;
+    if (!answered) return selected ? 'selected' : '';
+    if (selected && option === question.correct_option) return 'answer-correct';
+    if (selected) return 'answer-wrong';
+    if (option === question.correct_option) return 'reveal-correct';
+    return '';
 }
 
 function selectOption(option) {
+    if (answeredQuestions.has(currentQuestionIndex)) return;
+
     userAnswers[currentQuestionIndex] = option;
+    const question = questions[currentQuestionIndex];
+    const isCorrect = isQuestionAnswerCorrect(question, option);
+    answeredQuestions.add(currentQuestionIndex);
+    if (isCorrect && isBiteSizedLesson()) skillCorrectCount++;
+    playAnswerSound(isCorrect);
+    showInstantAiFeedback(isCorrect, question.correct_option);
+
     renderQuestion();
+}
+
+function updateBiteSizedProgress() {
+    if (!isBiteSizedLesson() || !questions.length) return;
+    const progress = (skillCorrectCount / questions.length) * 100;
+    document.getElementById('progress-bar').style.width = `${progress}%`;
+    const label = document.getElementById('skill-progress-label');
+    if (label) label.textContent = `Đã làm đúng ${skillCorrectCount}/${questions.length} câu`;
+}
+
+function playAnswerSound(isCorrect) {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const context = new AudioContext();
+        const notes = isCorrect ? [523.25, 659.25, 783.99] : [246.94, 196];
+        notes.forEach((frequency, index) => {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const start = context.currentTime + index * .09;
+            oscillator.type = isCorrect ? 'sine' : 'triangle';
+            oscillator.frequency.setValueAtTime(frequency, start);
+            gain.gain.setValueAtTime(.0001, start);
+            gain.gain.exponentialRampToValueAtTime(.14, start + .015);
+            gain.gain.exponentialRampToValueAtTime(.0001, start + .16);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(start + .18);
+        });
+        setTimeout(() => context.close(), 700);
+    } catch (error) {
+        console.debug('Trình duyệt không phát được âm thanh phản hồi:', error);
+    }
+}
+
+function showInstantAiFeedback(isCorrect, correctOption, customMessage = '') {
+    const feedback = document.getElementById('instant-ai-feedback');
+    const title = document.getElementById('instant-ai-title');
+    const message = document.getElementById('instant-ai-message');
+    if (!feedback || !title || !message) return;
+
+    const correctMessages = [
+        'Chính xác! Bạn đang tiến rất tốt 🌟',
+        'Xuất sắc! Miếng kiến thức này đã thuộc về bạn.',
+        'Đúng rồi! Thanh tiến trình vừa tăng thêm một chút.',
+        'Quá ổn! Giữ nhịp này nhé 🚀'
+    ];
+    const wrongMessages = [
+        `Chưa đúng rồi. Đáp án chính xác là ${correctOption}. Mình cùng ghi nhớ nhé!`,
+        `Suýt đúng! Đáp án là ${correctOption}. Không sao, câu sau mình làm tốt hơn.`,
+        `Mình cần xem lại chỗ này một chút. Đáp án đúng là ${correctOption}.`
+    ];
+    const messages = isCorrect ? correctMessages : wrongMessages;
+    title.textContent = isCorrect ? 'EduBot khen bạn!' : 'EduBot nhắc nhỏ';
+    message.textContent = customMessage || messages[Math.floor(Math.random() * messages.length)];
+    feedback.classList.remove('correct', 'wrong', 'show');
+    void feedback.offsetWidth;
+    feedback.classList.add(isCorrect ? 'correct' : 'wrong', 'show');
+    clearTimeout(instantFeedbackTimer);
+    instantFeedbackTimer = setTimeout(() => feedback.classList.remove('show'), 3200);
+}
+
+function hideInstantAiFeedback() {
+    const feedback = document.getElementById('instant-ai-feedback');
+    if (feedback) feedback.classList.remove('show');
 }
 
 function nextQuestion() {
     if (currentQuestionIndex < questions.length - 1) {
+        hideInstantAiFeedback();
         currentQuestionIndex++;
         renderQuestion();
     } else {
@@ -179,6 +467,7 @@ function nextQuestion() {
 
 function prevQuestion() {
     if (currentQuestionIndex > 0) {
+        hideInstantAiFeedback();
         currentQuestionIndex--;
         renderQuestion();
     }
@@ -207,7 +496,7 @@ async function submitQuiz() {
     
     let correctCount = 0;
     questions.forEach((q, index) => {
-        if (userAnswers[index] === q.correct_option) {
+        if (isQuestionAnswerCorrect(q, userAnswers[index])) {
             correctCount++;
         }
     });
@@ -216,7 +505,9 @@ async function submitQuiz() {
     
     // Show results in modal
     document.getElementById('final-score').textContent = score.toFixed(1);
-    document.getElementById('result-msg').textContent = `Bạn đã trả lời đúng ${correctCount}/${questions.length} câu hỏi.`;
+    document.getElementById('result-msg').textContent = currentMode === 'practice' && currentSource === 'skill-tree'
+        ? `Bạn đã trả lời đúng ${correctCount}/${questions.length} câu. ${score >= 5 ? 'Trạm tiếp theo đã được mở khóa!' : 'Bạn cần đạt ít nhất 5 điểm để mở khóa trạm tiếp theo.'}`
+        : `Bạn đã trả lời đúng ${correctCount}/${questions.length} câu hỏi.`;
     document.getElementById('result-modal').style.display = 'flex';
 
     // Submit to API
@@ -332,6 +623,15 @@ async function loadRandomQuiz(subjectId, excludeId = null, grade = null) {
 }
 
 async function loadAnotherQuiz() {
+    if (currentMode === 'practice') {
+        const query = currentSubjectId
+            ? `?subject=${currentSubjectId}${currentGrade ? `&grade=${currentGrade}` : ''}`
+            : '';
+        const destination = currentSource === 'skill-tree' ? 'skill-tree.html' : 'practice.html';
+        window.location.href = `${destination}${query}`;
+        return;
+    }
+
     if (currentSubjectId) {
         // Reset state
         document.getElementById('result-modal').style.display = 'none';
@@ -356,14 +656,15 @@ function showReview() {
     let hasWrong = false;
 
     questions.forEach((q, index) => {
-        if (userAnswers[index] !== q.correct_option) {
+        if (!isQuestionAnswerCorrect(q, userAnswers[index])) {
             hasWrong = true;
+            const expectedAnswer = q.question_type === 'fill_blank' ? q.correct_answer : q.correct_option;
             const item = document.createElement('div');
             item.className = 'wrong-answer-item';
             item.innerHTML = `
                 <b>Câu ${index + 1}: ${autoWrapMath(q.content)}</b>
                 <p>Bạn chọn: <span class="your-ans">${userAnswers[index] || 'Chưa trả lời'}</span></p>
-                <p>Đáp án đúng: <span class="correct-ans">${q.correct_option}</span></p>
+                <p>Đáp án đúng: <span class="correct-ans">${escapeAttribute(expectedAnswer)}</span></p>
                 ${q.explanation ? `<p style="font-size: 0.9rem; color: #64748b; margin-top: 8px;"><i>💡 Giải thích: ${autoWrapMath(q.explanation)}</i></p>` : ''}
             `;
             list.appendChild(item);
@@ -399,7 +700,7 @@ async function analyzeAI() {
     // Calculate final score if not already available
     let correctCount = 0;
     questions.forEach((q, index) => {
-        if (userAnswers[index] === q.correct_option) {
+        if (isQuestionAnswerCorrect(q, userAnswers[index])) {
             correctCount++;
         }
     });

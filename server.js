@@ -1,3 +1,4 @@
+// v2 - fix: duration_minutes uses 0 for practice quizzes
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -334,18 +335,308 @@ app.get('/api/subjects', async (req, res) => {
     }
 });
 
+// Topics endpoints
+app.get('/api/topics', async (req, res) => {
+    const { subject_id, grade } = req.query;
+    try {
+        let query = 'SELECT * FROM topics';
+        let params = [];
+        if (subject_id && grade) {
+            query += ' WHERE subject_id = $1 AND grade = $2';
+            params = [subject_id, grade];
+        } else if (subject_id) {
+            query += ' WHERE subject_id = $1';
+            params = [subject_id];
+        } else if (grade) {
+            query += ' WHERE grade = $1';
+            params = [grade];
+        }
+        query += ' ORDER BY id ASC';
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+app.post('/api/admin/topics', [auth, adminAuth], async (req, res) => {
+    const { name, subject_id, grade } = req.body;
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedSubjectId = Number(subject_id);
+    const normalizedGrade = Number(grade);
+    if (!normalizedName || !Number.isInteger(normalizedSubjectId) || ![10, 11, 12].includes(normalizedGrade)) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ thông tin chủ đề.' });
+    }
+    try {
+        const result = await db.query(
+            'INSERT INTO topics (name, subject_id, grade) VALUES ($1, $2, $3) RETURNING *',
+            [normalizedName, normalizedSubjectId, normalizedGrade]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        if (err.code === '23503') {
+            return res.status(400).json({ msg: 'Môn học không tồn tại.' });
+        }
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+app.put('/api/admin/topics/:id', [auth, adminAuth], async (req, res) => {
+    const id = Number(req.params.id);
+    const { name, subject_id, grade } = req.body;
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedSubjectId = Number(subject_id);
+    const normalizedGrade = Number(grade);
+
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ msg: 'ID chủ đề không hợp lệ.' });
+    }
+    if (!normalizedName || !Number.isInteger(normalizedSubjectId) || ![10, 11, 12].includes(normalizedGrade)) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ thông tin chủ đề.' });
+    }
+
+    try {
+        const result = await db.query(
+            `UPDATE topics
+             SET name = $1, subject_id = $2, grade = $3
+             WHERE id = $4
+             RETURNING *`,
+            [normalizedName, normalizedSubjectId, normalizedGrade, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ msg: 'Không tìm thấy chủ đề.' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        if (err.code === '23503') {
+            return res.status(400).json({ msg: 'Môn học không tồn tại.' });
+        }
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+app.delete('/api/admin/topics/:id', [auth, adminAuth], async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ msg: 'ID chủ đề không hợp lệ.' });
+    }
+    try {
+        const result = await db.query('DELETE FROM topics WHERE id = $1 RETURNING id', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ msg: 'Không tìm thấy chủ đề.' });
+        }
+        res.json({ msg: 'Đã xóa chủ đề thành công.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+const SKILL_TREE_PASS_SCORE = 5;
+
+async function buildSkillTree(userId, subjectId, grade) {
+    const subjectResult = await db.query(
+        'SELECT id, name, slug FROM subjects WHERE id = $1',
+        [subjectId]
+    );
+    if (subjectResult.rows.length === 0) return null;
+
+    const [topicsResult, quizzesResult] = await Promise.all([
+        db.query(
+            `SELECT id, name
+             FROM topics
+             WHERE subject_id = $1 AND grade = $2
+             ORDER BY id ASC`,
+            [subjectId, grade]
+        ),
+        db.query(
+            `SELECT q.id, q.title, q.topic_id, q.duration_minutes, q.is_practice,
+                    COALESCE(MAX(r.score), 0) AS best_score,
+                    COUNT(DISTINCT r.id)::int AS attempts,
+                    COUNT(DISTINCT question.id)::int AS question_count
+             FROM quizzes q
+             LEFT JOIN results r ON r.quiz_id = q.id AND r.user_id = $3
+             LEFT JOIN questions question ON question.quiz_id = q.id
+             WHERE q.subject_id = $1 AND q.grade = $2
+             GROUP BY q.id
+             ORDER BY q.id ASC`,
+            [subjectId, grade, userId]
+        )
+    ]);
+
+    const quizzesByTopic = new Map();
+    const generalQuizzes = [];
+    for (const quiz of quizzesResult.rows) {
+        // Skill Tree nodes are intentionally bite-sized: 10-15 questions.
+        // Longer quizzes are capped to 15 on the client; shorter drafts stay unavailable.
+        if (Number(quiz.question_count) < 10) continue;
+        if (quiz.topic_id) {
+            if (!quizzesByTopic.has(Number(quiz.topic_id))) {
+                quizzesByTopic.set(Number(quiz.topic_id), []);
+            }
+            quizzesByTopic.get(Number(quiz.topic_id)).push(quiz);
+        } else {
+            generalQuizzes.push(quiz);
+        }
+    }
+
+    const rawNodes = [];
+    for (const topic of topicsResult.rows) {
+        const topicQuizzes = quizzesByTopic.get(Number(topic.id)) || [];
+        if (topicQuizzes.length === 0) {
+            rawNodes.push({
+                key: `topic-${topic.id}`,
+                topic_id: topic.id,
+                topic_name: topic.name,
+                quiz_id: null,
+                title: topic.name,
+                unavailable: true,
+                best_score: null,
+                attempts: 0
+            });
+            continue;
+        }
+
+        topicQuizzes.forEach((quiz, index) => {
+            rawNodes.push({
+                key: `quiz-${quiz.id}`,
+                topic_id: topic.id,
+                topic_name: topic.name,
+                quiz_id: quiz.id,
+                title: topicQuizzes.length > 1 ? `${topic.name} · Bài ${index + 1}` : topic.name,
+                quiz_title: quiz.title,
+                duration_minutes: quiz.duration_minutes,
+                question_count: Math.min(15, Number(quiz.question_count)),
+                best_score: Number(quiz.best_score || 0),
+                attempts: Number(quiz.attempts || 0),
+                unavailable: false
+            });
+        });
+    }
+
+    generalQuizzes.forEach((quiz, index) => {
+        rawNodes.push({
+            key: `quiz-${quiz.id}`,
+            topic_id: null,
+            topic_name: 'Ôn tập tổng hợp',
+            quiz_id: quiz.id,
+            title: generalQuizzes.length > 1 ? `Ôn tập tổng hợp · Bài ${index + 1}` : 'Ôn tập tổng hợp',
+            quiz_title: quiz.title,
+            duration_minutes: quiz.duration_minutes,
+            question_count: Math.min(15, Number(quiz.question_count)),
+            best_score: Number(quiz.best_score || 0),
+            attempts: Number(quiz.attempts || 0),
+            unavailable: false
+        });
+    });
+
+    let previousActionablePassed = true;
+    let completed = 0;
+    let actionableCount = 0;
+    const nodes = rawNodes.map((node) => {
+        if (node.unavailable) return { ...node, status: 'unavailable', unlocked: false, passed: false };
+
+        actionableCount++;
+        const passed = node.best_score >= SKILL_TREE_PASS_SCORE;
+        const unlocked = previousActionablePassed;
+        const effectivePassed = unlocked && passed;
+        const status = effectivePassed ? 'completed' : (unlocked ? 'current' : 'locked');
+        if (effectivePassed) completed++;
+        previousActionablePassed = effectivePassed;
+        return { ...node, status, unlocked, passed };
+    });
+
+    return {
+        subject: subjectResult.rows[0],
+        grade,
+        pass_score: SKILL_TREE_PASS_SCORE,
+        completed,
+        total: actionableCount,
+        progress_percent: actionableCount ? Math.round((completed / actionableCount) * 100) : 0,
+        nodes
+    };
+}
+
+app.get('/api/skill-tree', auth, async (req, res) => {
+    const subjectId = Number(req.query.subject_id);
+    const grade = Number(req.query.grade);
+    if (!Number.isInteger(subjectId) || ![10, 11, 12].includes(grade)) {
+        return res.status(400).json({ msg: 'Môn học hoặc lớp không hợp lệ.' });
+    }
+
+    try {
+        const tree = await buildSkillTree(req.user.id, subjectId, grade);
+        if (!tree) return res.status(404).json({ msg: 'Không tìm thấy môn học.' });
+        res.json(tree);
+    } catch (err) {
+        console.error('Skill tree error:', err.message);
+        res.status(500).json({ msg: 'Không thể tải bản đồ học tập.' });
+    }
+});
+
+app.get('/api/skill-tree/access/:quizId', auth, async (req, res) => {
+    const quizId = Number(req.params.quizId);
+    if (!Number.isInteger(quizId) || quizId <= 0) {
+        return res.status(400).json({ msg: 'Bài học không hợp lệ.' });
+    }
+
+    try {
+        const quizResult = await db.query(
+            'SELECT id, subject_id, grade FROM quizzes WHERE id = $1',
+            [quizId]
+        );
+        if (quizResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'Không tìm thấy bài học.' });
+        }
+
+        const quiz = quizResult.rows[0];
+        const tree = await buildSkillTree(req.user.id, Number(quiz.subject_id), Number(quiz.grade));
+        const node = tree.nodes.find(item => Number(item.quiz_id) === quizId);
+        const unlocked = Boolean(node && node.unlocked);
+        res.json({
+            unlocked,
+            status: node?.status || 'locked',
+            subject_id: quiz.subject_id,
+            grade: quiz.grade,
+            pass_score: SKILL_TREE_PASS_SCORE,
+            msg: unlocked ? null : 'Bạn cần hoàn thành trạm trước với ít nhất 5 điểm.'
+        });
+    } catch (err) {
+        console.error('Skill tree access error:', err.message);
+        res.status(500).json({ msg: 'Không thể kiểm tra quyền truy cập bài học.' });
+    }
+});
+
 // 2. Get quizzes by subject
 app.get('/api/quizzes/:subject_id', async (req, res) => {
     const { subject_id } = req.params;
-    const grade = req.query.grade;
+    const { grade, is_practice, topic_id } = req.query;
     try {
-        let query = 'SELECT * FROM quizzes WHERE subject_id = $1';
+        let query = `
+            SELECT q.*, t.name as topic_name 
+            FROM quizzes q
+            LEFT JOIN topics t ON q.topic_id = t.id
+            WHERE q.subject_id = $1
+        `;
         let params = [subject_id];
         
         if (grade) {
-            query += ' AND grade = $2';
+            query += ' AND q.grade = $' + (params.length + 1);
             params.push(grade);
         }
+        if (is_practice !== undefined) {
+            query += ' AND q.is_practice = $' + (params.length + 1);
+            params.push(is_practice === 'true' || is_practice === true);
+        }
+        if (topic_id) {
+            query += ' AND q.topic_id = $' + (params.length + 1);
+            params.push(topic_id);
+        }
+
+        query += ' ORDER BY q.id ASC';
         
         const result = await db.query(query, params);
         res.json(result.rows);
@@ -528,7 +819,13 @@ app.delete('/api/admin/user/:id', [auth, adminAuth], async (req, res) => {
 // 8. Admin: Quiz Management
 app.get('/api/admin/quizzes', [auth, adminAuth], async (req, res) => {
     try {
-        const result = await db.query('SELECT q.*, s.name as subject_name FROM quizzes q JOIN subjects s ON q.subject_id = s.id ORDER BY q.id DESC');
+        const result = await db.query(`
+            SELECT q.*, s.name as subject_name, t.name as topic_name 
+            FROM quizzes q 
+            JOIN subjects s ON q.subject_id = s.id 
+            LEFT JOIN topics t ON q.topic_id = t.id 
+            ORDER BY q.id DESC
+        `);
         const quizzes = await Promise.all(result.rows.map(async (quiz) => {
             const repairedTitle = repairUtf8Mojibake(quiz.title);
             if (repairedTitle !== quiz.title) {
@@ -537,7 +834,8 @@ app.get('/api/admin/quizzes', [auth, adminAuth], async (req, res) => {
             return {
                 ...quiz,
                 title: repairedTitle,
-                subject_name: repairUtf8Mojibake(quiz.subject_name)
+                subject_name: repairUtf8Mojibake(quiz.subject_name),
+                topic_name: quiz.topic_name ? repairUtf8Mojibake(quiz.topic_name) : null
             };
         }));
         res.json(quizzes);
@@ -686,36 +984,70 @@ app.get('/api/admin/quiz/:id/questions', [auth, adminAuth], async (req, res) => 
 });
 
 // Admin: Update Quiz
-app.put('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
-    const { title, subject_id, grade, duration_minutes, questions } = req.body;
-    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
-    const normalizedQuestions = Array.isArray(questions) ? questions : [];
+function normalizeQuestionInput(question = {}) {
+    const questionType = question.question_type === 'fill_blank' ? 'fill_blank' : 'multiple_choice';
+    return {
+        content: typeof question.content === 'string' ? question.content.trim() : '',
+        question_type: questionType,
+        option_a: questionType === 'fill_blank' ? '' : String(question.option_a || '').trim(),
+        option_b: questionType === 'fill_blank' ? '' : String(question.option_b || '').trim(),
+        option_c: questionType === 'fill_blank' ? '' : String(question.option_c || '').trim(),
+        option_d: questionType === 'fill_blank' ? '' : String(question.option_d || '').trim(),
+        correct_option: questionType === 'fill_blank' ? null : question.correct_option,
+        correct_answer: questionType === 'fill_blank' ? String(question.correct_answer ?? '').trim() : null,
+        explanation: typeof question.explanation === 'string' ? question.explanation.trim() : ''
+    };
+}
 
-    if (!normalizedTitle || !subject_id || !grade || !duration_minutes) {
-        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ thông tin đề thi.' });
+function isValidQuestionInput(question) {
+    if (!question.content) return false;
+    if (question.question_type === 'fill_blank') {
+        return question.correct_answer.length > 0 && Number.isFinite(Number(question.correct_answer.replace(',', '.')));
+    }
+    return Boolean(
+        question.option_a && question.option_b && question.option_c && question.option_d &&
+        ['A', 'B', 'C', 'D'].includes(question.correct_option)
+    );
+}
+
+async function insertQuestionRecord(client, quizId, rawQuestion) {
+    const question = normalizeQuestionInput(rawQuestion);
+    await client.query(
+        `INSERT INTO questions
+         (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, question_type, correct_answer, explanation)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+            quizId, question.content, question.option_a, question.option_b,
+            question.option_c, question.option_d, question.correct_option,
+            question.question_type, question.correct_answer, question.explanation
+        ]
+    );
+}
+
+app.put('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
+    const { title, subject_id, grade, duration_minutes, questions, topic_id } = req.body;
+    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+    const normalizedQuestions = Array.isArray(questions) ? questions.map(normalizeQuestionInput) : [];
+
+    if (!normalizedTitle || !subject_id || !grade) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ tiêu đề, môn học và lớp.' });
+    }
+    if (!duration_minutes) {
+        return res.status(400).json({ msg: 'Vui lòng nhập thời gian làm bài.' });
     }
     if (normalizedQuestions.length === 0) {
         return res.status(400).json({ msg: 'Đề thi phải có ít nhất một câu hỏi.' });
     }
-    const isNonEmptyString = value => typeof value === 'string' && value.trim().length > 0;
-    if (normalizedQuestions.some(q =>
-        !q ||
-        !isNonEmptyString(q.content) ||
-        !isNonEmptyString(q.option_a) ||
-        !isNonEmptyString(q.option_b) ||
-        !isNonEmptyString(q.option_c) ||
-        !isNonEmptyString(q.option_d) ||
-        !['A', 'B', 'C', 'D'].includes(q.correct_option)
-    )) {
-        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ nội dung, bốn đáp án và đáp án đúng cho mỗi câu hỏi.' });
+    if (normalizedQuestions.some(question => !isValidQuestionInput(question))) {
+        return res.status(400).json({ msg: 'Câu A-D cần đủ bốn lựa chọn; câu Điền số cần một đáp án số hợp lệ.' });
     }
 
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
         const result = await client.query(
-            'UPDATE quizzes SET title = $1, subject_id = $2, grade = $3, duration_minutes = $4 WHERE id = $5 RETURNING *',
-            [normalizedTitle, subject_id, grade, duration_minutes, req.params.id]
+            'UPDATE quizzes SET title = $1, subject_id = $2, grade = $3, duration_minutes = $4, topic_id = $5 WHERE id = $6 RETURNING *',
+            [normalizedTitle, subject_id, grade, parseInt(duration_minutes) || 15, topic_id || null, req.params.id]
         );
 
         if (result.rowCount === 0) {
@@ -725,21 +1057,7 @@ app.put('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
 
         await client.query('DELETE FROM questions WHERE quiz_id = $1', [req.params.id]);
         for (const question of normalizedQuestions) {
-            await client.query(
-                `INSERT INTO questions
-                 (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [
-                    req.params.id,
-                    question.content.trim(),
-                    question.option_a.trim(),
-                    question.option_b.trim(),
-                    question.option_c.trim(),
-                    question.option_d.trim(),
-                    question.correct_option,
-                    typeof question.explanation === 'string' ? question.explanation.trim() : ''
-                ]
-            );
+            await insertQuestionRecord(client, req.params.id, question);
         }
 
         await client.query('COMMIT');
@@ -840,6 +1158,11 @@ const quizQuestionsSchema = {
     items: {
         type: SchemaType.OBJECT,
         properties: {
+            question_type: {
+                type: SchemaType.STRING,
+                format: 'enum',
+                enum: ['multiple_choice', 'fill_blank']
+            },
             content: { type: SchemaType.STRING },
             option_a: { type: SchemaType.STRING },
             option_b: { type: SchemaType.STRING },
@@ -850,15 +1173,12 @@ const quizQuestionsSchema = {
                 format: 'enum',
                 enum: ['A', 'B', 'C', 'D']
             },
+            correct_answer: { type: SchemaType.STRING },
             explanation: { type: SchemaType.STRING }
         },
         required: [
+            'question_type',
             'content',
-            'option_a',
-            'option_b',
-            'option_c',
-            'option_d',
-            'correct_option',
             'explanation'
         ]
     }
@@ -927,7 +1247,7 @@ app.post('/api/admin/scan-quiz', [auth, adminAuth, upload.single('file')], async
         const prompt = `Bạn là một chuyên gia soạn đề thi. Hãy trích xuất các câu hỏi trắc nghiệm từ văn bản sau đây.
         Yêu cầu:
         1. Trả về định dạng JSON là một mảng các đối tượng.
-        2. Mỗi đối tượng gồm: "content" (câu hỏi), "option_a", "option_b", "option_c", "option_d", "correct_option" (chỉ ghi chữ cái A, B, C hoặc D), và "explanation" (giải thích ngắn gọn).
+        2. Đặt "question_type": "multiple_choice". Mỗi đối tượng gồm: "content" (câu hỏi), "option_a", "option_b", "option_c", "option_d", "correct_option" (chỉ ghi chữ cái A, B, C hoặc D), và "explanation" (giải thích ngắn gọn).
         3. Tất cả ngày tháng năm trong câu hỏi, đáp án và giải thích phải giữ/chuẩn hóa theo định dạng dd/mm/yyyy (ví dụ: 05/09/2026).
         4. Văn bản: ${text}`;
 
@@ -1097,6 +1417,7 @@ app.get('/api/leaderboard', async (req, res) => {
 // Admin: AI Generate Quiz
 app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
     const { subject_id, grade, count, subject_name } = req.body;
+    const supportsFillBlank = [1, 2, 3].includes(Number(subject_id)) || /toán|vật lý|hóa/i.test(String(subject_name || ''));
     
     try {
         const gemini = await getGeminiClient();
@@ -1115,8 +1436,10 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
             
             Yêu cầu nội dung:
             - Phân bổ độ khó: 40% Nhận biết, 30% Thông hiểu, 20% Vận dụng, 10% Vận dụng cao.
-            - Mỗi câu hỏi phải có 4 phương án lựa chọn (A, B, C, D).
-            - Chỉ có duy nhất 1 đáp án đúng.
+            ${supportsFillBlank
+                ? `- Khoảng 30% câu hỏi phải là dạng điền kết quả số cuối cùng với question_type="fill_blank", correct_answer là chuỗi số; không cần option_a..option_d và correct_option.
+                   - Các câu còn lại dùng question_type="multiple_choice", có đủ 4 phương án A-D và đúng duy nhất một phương án.`
+                : '- Tất cả câu hỏi dùng question_type="multiple_choice", có đủ 4 phương án A-D và đúng duy nhất một phương án.'}
             - Phải có phần giải thích ngắn gọn cho đáp án đúng.
             - Tất cả ngày tháng năm trong câu hỏi, đáp án và giải thích phải có định dạng dd/mm/yyyy (ví dụ: 05/09/2026).
             - QUAN TRỌNG: Tất cả các công thức toán học, vật lý, hóa học, ký hiệu khoa học (như số pi, alpha, beta, tích phân, đạo hàm, phân số, số mũ, phương trình...) ở câu hỏi, các lựa chọn đáp án và phần giải thích BẮT BUỘC phải đặt trong cặp dấu đô-la single '$' cho công thức nội dòng (ví dụ: $y = x^2$, $H_2SO_4$, $\\alpha$) hoặc double '$$' cho khối công thức riêng biệt.
@@ -1125,12 +1448,14 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
             BẮT BUỘC ĐÚNG ĐỊNH DẠNG JSON. Không sử dụng ký tự đặc biệt gây lỗi JSON.
             [
                 {
+                    "question_type": "multiple_choice hoặc fill_blank",
                     "content": "Nội dung câu hỏi...",
                     "option_a": "...",
                     "option_b": "...",
                     "option_c": "...",
                     "option_d": "...",
                     "correct_option": "A/B/C/D",
+                    "correct_answer": "chỉ dùng cho fill_blank, ví dụ 12.5",
                     "explanation": "..."
                 }
             ]
@@ -1155,7 +1480,10 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
         // Fix potential trailing commas before closing bracket
         cleanedJson = cleanedJson.replace(/,\s*\]/g, ']');
         
-        const questions = parseAiQuizQuestions(cleanedJson);
+        const questions = parseAiQuizQuestions(cleanedJson).map(normalizeQuestionInput);
+        if (questions.length === 0 || questions.some(question => !isValidQuestionInput(question))) {
+            throw new Error('AI trả về câu hỏi thiếu đáp án hoặc sai định dạng.');
+        }
 
         const isPreview = (req.body.preview === true || req.body.preview === 'true' || req.query.preview === 'true');
         if (isPreview) {
@@ -1181,10 +1509,7 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
             const quizId = newQuiz.rows[0].id;
 
             for (const q of questions) {
-                await client.query(
-                    'INSERT INTO questions (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                    [quizId, q.content, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation]
-                );
+                await insertQuestionRecord(client, quizId, q);
             }
             await client.query('COMMIT');
             res.json({ msg: 'Quiz generated successfully', quiz_id: quizId });
@@ -1202,7 +1527,14 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
             const questions = [];
             const num = parseInt(count) || 10;
             for (let i = 1; i <= num; i++) {
-                questions.push({
+                const useFillBlank = supportsFillBlank && i % 3 === 0;
+                questions.push(useFillBlank ? {
+                    question_type: 'fill_blank',
+                    content: `Tính giá trị biểu thức $${i} + ${i}$ và điền kết quả cuối cùng.`,
+                    correct_answer: String(i * 2),
+                    explanation: `$${i} + ${i} = ${i * 2}$.`
+                } : {
+                    question_type: 'multiple_choice',
                     content: `Câu hỏi mẫu số ${i} môn ${subject_name} Lớp ${grade} (Tự động tạo do hết hạn ngạch API $y = f(x)$)`,
                     option_a: `Đáp án A của câu hỏi ${i}`,
                     option_b: `Đáp án B của câu hỏi ${i}`,
@@ -1238,10 +1570,7 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
                 const quizId = newQuiz.rows[0].id;
 
                 for (const q of questions) {
-                    await client.query(
-                        'INSERT INTO questions (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                        [quizId, q.content, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation]
-                    );
+                    await insertQuestionRecord(client, quizId, q);
                 }
                 await client.query('COMMIT');
                 return res.json({ msg: 'Quiz generated successfully (MOCK)', quiz_id: quizId, is_mock: true });
@@ -1259,20 +1588,24 @@ app.post('/api/admin/ai-generate-quiz', auth, adminAuth, async (req, res) => {
 
 // Admin: Manual Quiz Creation
 app.post('/api/admin/quiz-manual', [auth, adminAuth], async (req, res) => {
-    const { title, subject_id, grade, duration, questions } = req.body;
+    const { title, subject_id, grade, duration, questions, topic_id } = req.body;
+    const normalizedQuestions = Array.isArray(questions) ? questions.map(normalizeQuestionInput) : [];
+    if (!title || !subject_id || !grade || normalizedQuestions.length === 0) {
+        return res.status(400).json({ msg: 'Vui lòng nhập đầy đủ thông tin đề và ít nhất một câu hỏi.' });
+    }
+    if (normalizedQuestions.some(question => !isValidQuestionInput(question))) {
+        return res.status(400).json({ msg: 'Câu A-D cần đủ bốn lựa chọn; câu Điền số cần một đáp án số hợp lệ.' });
+    }
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
         const quizRes = await client.query(
-            'INSERT INTO quizzes (title, subject_id, grade, duration_minutes) VALUES ($1, $2, $3, $4) RETURNING id',
-            [title, subject_id, grade, duration]
+            'INSERT INTO quizzes (title, subject_id, grade, duration_minutes, topic_id, is_practice) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+            [title, subject_id, grade, duration, topic_id || null, false]
         );
         const quizId = quizRes.rows[0].id;
-        for (const q of questions) {
-            await client.query(
-                'INSERT INTO questions (quiz_id, content, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [quizId, q.content, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation]
-            );
+        for (const question of normalizedQuestions) {
+            await insertQuestionRecord(client, quizId, question);
         }
         await client.query('COMMIT');
         res.json({ msg: 'Quiz created successfully', id: quizId });
@@ -1286,6 +1619,99 @@ app.post('/api/admin/quiz-manual', [auth, adminAuth], async (req, res) => {
 });
 
 // AI Analysis & Roadmap
+function buildSafeFallbackHint(question) {
+    const content = String(question.content || '').toLowerCase();
+    if (content.includes('bậc 2') || /x\s*\^\s*2|x²/.test(content)) {
+        return 'Hãy đưa phương trình về dạng $ax^2 + bx + c = 0$, xác định $a, b, c$, rồi bắt đầu bằng việc tính $\Delta = b^2 - 4ac$. Dấu của $\Delta$ sẽ cho bạn biết bước tiếp theo.';
+    }
+    if (/vận tốc|gia tốc|quãng đường|lực|điện|dao động/.test(content)) {
+        return 'Hãy liệt kê các đại lượng đề bài đã cho kèm đơn vị, xác định đại lượng cần tìm, rồi chọn công thức chỉ chứa các đại lượng đó. Chưa cần thay số ngay.';
+    }
+    if (/mol|phản ứng|hóa học|nồng độ|khối lượng/.test(content)) {
+        return 'Hãy viết và cân bằng phương trình phản ứng trước, sau đó đổi dữ kiện về số mol. Từ tỉ lệ hệ số, bạn sẽ tìm được đại lượng cần thiết cho bước tiếp theo.';
+    }
+    return 'Hãy tách đề bài thành hai phần: dữ kiện đã biết và điều cần tìm. Sau đó nhớ lại công thức hoặc định nghĩa nối trực tiếp hai phần này, nhưng chưa vội tính kết quả cuối cùng.';
+}
+
+function hintRevealsFinalAnswer(hint, question) {
+    const text = String(hint || '');
+    if (/đáp\s*án\s*(?:là|:)?\s*[ABCD]\b/i.test(text)) return true;
+    if (question.question_type === 'fill_blank' && question.correct_answer) {
+        const answer = String(question.correct_answer).trim().replace(',', '.');
+        const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (escaped && new RegExp(`(?:kết quả|đáp án|bằng)\\s*(?:là|:)?\\s*${escaped}(?![\\d.])`, 'i').test(text.replace(',', '.'))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+app.post('/api/ai/hint', auth, async (req, res) => {
+    const questionId = Number(req.body.question_id);
+    if (!Number.isInteger(questionId) || questionId <= 0) {
+        return res.status(400).json({ msg: 'Câu hỏi không hợp lệ.' });
+    }
+
+    try {
+        const result = await db.query(
+            `SELECT question.*, quiz.title AS quiz_title, subject.name AS subject_name
+             FROM questions question
+             JOIN quizzes quiz ON quiz.id = question.quiz_id
+             JOIN subjects subject ON subject.id = quiz.subject_id
+             WHERE question.id = $1`,
+            [questionId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ msg: 'Không tìm thấy câu hỏi.' });
+
+        const question = result.rows[0];
+        const choices = question.question_type === 'fill_blank' ? '' : `
+Các lựa chọn học sinh đang thấy:
+A. ${question.option_a}
+B. ${question.option_b}
+C. ${question.option_c}
+D. ${question.option_d}`;
+        const prompt = `Bạn là gia sư Socratic cho học sinh THPT Việt Nam.
+Học sinh đang làm môn ${question.subject_name}, đề "${question.quiz_title}" và chưa biết bắt đầu câu sau:
+"${question.content}"
+${choices}
+
+Hãy đưa ra đúng MỘT gợi ý nhỏ bằng tiếng Việt, tối đa 3 câu:
+- Chỉ gợi mở công thức, khái niệm hoặc bước đầu tiên nên làm.
+- TUYỆT ĐỐI không giải hoàn chỉnh, không tính ra kết quả cuối cùng.
+- Không nói đáp án A/B/C/D và không tiết lộ giá trị đáp án điền số.
+- Nếu là phương trình bậc hai, hãy gợi ý xác định a, b, c và cách tính Delta, không nói nghiệm.
+- Giọng điệu thân thiện, khích lệ. Không mở đầu dài dòng.`;
+
+        try {
+            const gemini = await getGeminiClient();
+            const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+            const aiResult = await model.generateContent(prompt);
+            const hint = aiResult.response.text().trim();
+            if (!hint || hintRevealsFinalAnswer(hint, question)) {
+                return res.json({ hint: buildSafeFallbackHint(question), is_fallback: true });
+            }
+            return res.json({ hint, is_fallback: false });
+        } catch (aiError) {
+            console.warn('AI Hint fallback:', aiError.message);
+            return res.json({ hint: buildSafeFallbackHint(question), is_fallback: true });
+        }
+    } catch (err) {
+        console.error('AI Hint Error:', err.message);
+        res.status(500).json({ msg: 'Không thể tạo gợi ý lúc này.' });
+    }
+});
+
+function isStoredQuestionAnswerCorrect(question, answer) {
+    if (question.question_type !== 'fill_blank') {
+        return answer === question.correct_option;
+    }
+    const expected = Number(String(question.correct_answer ?? '').trim().replace(',', '.'));
+    const actual = Number(String(answer ?? '').trim().replace(',', '.'));
+    if (!Number.isFinite(expected) || !Number.isFinite(actual)) return false;
+    const tolerance = Math.max(1e-6, Math.abs(expected) * 1e-4);
+    return Math.abs(actual - expected) <= tolerance;
+}
+
 app.post('/api/ai/analyze-results', auth, async (req, res) => {
     const { quiz_id, score, correct_count, total_count, userAnswers } = req.body;
     console.log("AI Analysis Request for quiz_id:", quiz_id);
@@ -1304,10 +1730,10 @@ app.post('/api/ai/analyze-results', auth, async (req, res) => {
         // Identify wrong answers
         let weakPoints = [];
         questions.forEach((q, index) => {
-            if (userAnswers[index] !== q.correct_option) {
+            if (!isStoredQuestionAnswerCorrect(q, userAnswers[index])) {
                 weakPoints.push({
                     content: q.content,
-                    correct_option: q.correct_option,
+                    correct_option: q.question_type === 'fill_blank' ? q.correct_answer : q.correct_option,
                     explanation: q.explanation
                 });
             }

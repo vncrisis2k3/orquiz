@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thi theo chủ đề - Edu-Flow</title>
+    <meta name="description" content="Chọn đề thi theo chủ đề môn học, lớp học và làm bài với thời gian giới hạn trên Edu-Flow.">
+    <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
+    <style>
+        :root {
+            --primary: #FF8A00;
+            --primary-dark: #E67E00;
+            --primary-light: #FFAC52;
+            --primary-soft: rgba(255, 138, 0, 0.08);
+            --secondary: #1E293B;
+            --text-gray: #64748B;
+        }
+        .exams-header {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            padding: 80px 0;
+            color: white;
+            border-radius: 0 0 50px 50px;
+            margin-bottom: 50px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(30, 41, 59, 0.25);
+        }
+        .exams-header::before {
+            content: '';
+            position: absolute;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(255,138,0,0.15) 0%, transparent 70%);
+            top: -100px; right: -100px;
+            border-radius: 50%;
+        }
+        .exams-container { padding-bottom: 100px; }
+        .exams-info-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 35px 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.04);
+            margin-bottom: 50px;
+            border: 1px solid rgba(30, 41, 59, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        .exams-info-icon {
+            font-size: 46px;
+            background: rgba(30, 41, 59, 0.05);
+            width: 86px; height: 86px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 22px; flex-shrink: 0;
+        }
+        .exams-info-text h3 { color: var(--secondary); font-size: 1.35rem; margin-bottom: 8px; font-weight: 800; }
+        .exams-info-text p { color: var(--text-gray); line-height: 1.6; }
+
+        /* Topic Card */
+        .topic-card {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            transition: all 0.3s ease;
+        }
+        .topic-card:hover {
+            box-shadow: 0 10px 20px -3px rgba(0,0,0,0.07);
+            border-color: rgba(30, 41, 59, 0.25);
+        }
+        .topic-header {
+            padding: 20px 25px;
+            background: #f8fafc;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+        .topic-header:hover { background: #f1f5f9; }
+        .topic-title {
+            font-size: 1.1rem; font-weight: 700; color: var(--secondary);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .topic-badge {
+            background: rgba(30, 41, 59, 0.08);
+            color: var(--secondary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem; font-weight: 700;
+        }
+        .topic-body {
+            padding: 20px 25px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        .topic-card:hover {
+            box-shadow: 0 10px 20px -3px rgba(0,0,0,0.07);
+            border-color: rgba(30, 41, 59, 0.25);
+        }
+        .quiz-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            transition: all 0.2s ease;
+        }
+        .quiz-list-item:hover {
+            background: #f1f5f9;
+            transform: translateX(5px);
+            border-color: #cbd5e1;
+        }
+        .quiz-info h4 { font-size: 1.05rem; font-weight: 700; color: var(--secondary); margin-bottom: 6px; }
+        .quiz-meta { font-size: 0.85rem; color: var(--text-gray); display: flex; gap: 20px; flex-wrap: wrap; }
+        .btn-back {
+            background: white; border: 1px solid #cbd5e1; color: var(--secondary);
+            padding: 10px 20px; border-radius: 12px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s ease; font-size: 0.95rem;
+        }
+        .btn-back:hover { background: #f8fafc; border-color: #94a3b8; }
+        .exam-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(239, 68, 68, 0.08); color: #dc2626;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 700;
+        }
+        .empty-topic-msg {
+            color: var(--text-gray);
+            font-style: italic;
+            font-size: 0.9rem;
+            padding: 12px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .exams-info-card { flex-direction: column; text-align: center; padding: 25px 20px; }
+            .quiz-list-item { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .quiz-list-item .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body style="background: #F8FAFC;">
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <ul class="nav-links" id="nav-links"><!-- Injected by JS --></ul>
+        </div>
+    </nav>
+
+    <header class="exams-header">
+        <div class="container" style="position: relative; z-index: 1;">
+            <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 15px;">🎯 Kiểm tra theo chủ đề</h1>
+            <p style="font-size: 1.1rem; opacity: 0.85; max-width: 600px; margin: 0 auto; line-height: 1.6;">
+                Chọn chủ đề và làm bài kiểm tra với thời gian đếm ngược. Kết quả sẽ được tính điểm và cập nhật bảng xếp hạng.
+            </p>
+        </div>
+    </header>
+
+    <main class="container exams-container">
+        <!-- Main view: subject selection -->
+        <div id="exams-main-view" class="reveal">
+            <div class="exams-info-card">
+                <div class="exams-info-icon">⏱️</div>
+                <div class="exams-info-text">
+                    <h3>Bài kiểm tra có đếm ngược thời gian</h3>
+                    <p>Mỗi bài kiểm tra có thời gian giới hạn và đếm ngược. Hoàn thành trước thời gian để đạt điểm cao nhất. Kết quả sẽ được cộng điểm kinh nghiệm và cập nhật bảng xếp hạng.</p>
+                </div>
+            </div>
+
+            <section>
+                <div class="section-header" style="margin-bottom: 50px;">
+                    <h2 style="font-size: 2rem; font-weight: 800;">Chọn môn học để bắt đầu</h2>
+                    <p style="font-size: 0.95rem; margin-top: 10px; color: var(--text-gray);">Lọc đề thi theo cấp lớp phù hợp với bạn:</p>
+                    <div class="grade-selector" style="margin-top: 25px;">
+                        <button class="btn btn-outline grade-btn" data-grade="10" onclick="selectGrade(10)">Lớp 10</button>
+                        <button class="btn btn-outline grade-btn" data-grade="11" onclick="selectGrade(11)">Lớp 11</button>
+                        <button class="btn btn-primary grade-btn" data-grade="12" onclick="selectGrade(12)">Lớp 12</button>
+                    </div>
+                </div>
+
+                <div class="subject-grid" id="subject-grid">
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-gray);">
+                        Đang tải danh sách môn học...
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Topics view: shown when a subject is selected -->
+        <div id="topics-view" style="display: none;" class="reveal">
+            <button class="btn-back" onclick="showSubjectsView()" style="margin-bottom: 25px; display: inline-flex; align-items: center; gap: 8px;">
+                ← Quay lại danh sách môn
+            </button>
+            <div class="section-header" style="margin-bottom: 35px;">
+                <h2 id="topics-title" style="font-size: 2rem; font-weight: 800; color: var(--secondary);">Đề kiểm tra theo chủ đề</h2>
+                <p id="topics-subtitle" style="font-size: 0.95rem; margin-top: 10px; color: var(--text-gray);">Chọn chủ đề và bấm "Vào thi" để bắt đầu bài kiểm tra có đếm ngược thời gian.</p>
+            </div>
+
+            <div id="topics-container" style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Topics & quizzes injected by JS -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <a href="index.html" class="logo">Edu<span>Flow</span></a>
+            <p>&copy; 2026 Edu-Flow Platform. Mang lại kiến thức cho mọi người.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+        let currentGrade = 12;
+        let allSubjects = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) { window.location.href = 'auth.html'; return; }
+
+            updateNavbar();
+            // Khởi tạo hiệu ứng trước khi xử lý URL. Nhánh có ?subject=...
+            // sẽ return sớm, nên nếu đặt ở cuối thì topics-view luôn opacity: 0.
+            initScrollReveal();
+            await checkUserGrade(); // Lấy grade từ survey trước
+
+            const params = new URLSearchParams(window.location.search);
+            const subjectIdParam = params.get('subject');
+            const gradeParam = params.get('grade');
+            // URL param luôn thắng survey grade
+            if (gradeParam) { currentGrade = parseInt(gradeParam); }
+            updateGradeButtons();
+
+            // Nếu URL có subject param → load thẳng topics view mà không cần render subject grid
+            if (subjectIdParam) {
+                try {
+                    // Lấy tên môn từ API
+                    const subjectsRes = await fetch(`${API_URL}/subjects`);
+                    allSubjects = await subjectsRes.json();
+                    const found = allSubjects.find(s => String(s.id) === String(subjectIdParam));
+                    const subjectName = found ? found.name : `Môn học #${subjectIdParam}`;
+                    await loadSubjectTopics(parseInt(subjectIdParam), subjectName);
+                } catch (err) {
+                    console.error('Error loading subject:', err);
+                    // Fallback: gọi với tên chung
+                    await loadSubjectTopics(parseInt(subjectIdParam), `Môn học #${subjectIdParam}`);
+                }
+                return;
+            }
+
+            // Không có subject param → hiển thị danh sách môn học
+            await fetchSubjects();
+        });
+
+        function updateNavbar() {
+            const navLinks = document.getElementById('nav-links');
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user) {
+                navLinks.innerHTML = `
+                    <li><a href="index.html#subjects" style="color: var(--primary); font-weight: 700;">Kiểm tra</a></li>
+                    <li><a href="practice.html">Luyện tập</a></li>
+                    <li><a href="skill-tree.html">Bản đồ học tập</a></li>
+                    <li><a href="roadmap.html">Lộ trình</a></li>
+                    <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
+                    <li><a href="profile.html" class="btn btn-outline" style="padding: 8px 18px; border-radius: 12px;">Trang cá nhân</a></li>
+                    <li><a href="#" onclick="logout()" class="btn btn-primary" style="padding: 8px 18px; border-radius: 12px;">Đăng xuất</a></li>
+                `;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+
+        async function checkUserGrade() {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            try {
+                const res = await fetch(`${API_URL}/auth/user`, { headers: { 'x-auth-token': token } });
+                if (res.ok) {
+                    const user = await res.json();
+                    if (user.survey_data) {
+                        const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : user.survey_data;
+                        if (survey.grade) { currentGrade = parseInt(survey.grade); updateGradeButtons(); }
+                    }
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        function updateGradeButtons() {
+            document.querySelectorAll('.grade-btn').forEach(btn => {
+                const isActive = btn.getAttribute('data-grade') == currentGrade;
+                btn.classList.toggle('btn-primary', isActive);
+                btn.classList.toggle('btn-outline', !isActive);
+            });
+        }
+
+        function selectGrade(grade) {
+            currentGrade = grade;
+            updateGradeButtons();
+            fetchSubjects();
+            showSubjectsView();
+        }
+
+        function showSubjectsView() {
+            const mainView = document.getElementById('exams-main-view');
+            mainView.style.display = 'block';
+            mainView.classList.add('active');
+            document.getElementById('topics-view').style.display = 'none';
+        }
+
+        function toggleTopicBody(headerEl) {
+            const body = headerEl.nextElementSibling;
+            if (!body) return;
+            const isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'flex';
+            const arrow = headerEl.querySelector('.topic-arrow');
+            if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+        }
+
+        async function fetchSubjects() {
+            const subjectGrid = document.getElementById('subject-grid');
+            try {
+                const response = await fetch(`${API_URL}/subjects`);
+                const subjects = await response.json();
+                allSubjects = subjects;
+
+                if (subjects.length > 0) {
+                    subjectGrid.innerHTML = '';
+                    subjects.forEach((subject, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'subject-card stagger-reveal';
+                        card.style.transitionDelay = `${index * 0.08}s`;
+                        const icon = getSubjectIcon(subject.slug);
+                        card.innerHTML = `
+                            <div class="subject-icon ${icon.color}">${icon.emoji}</div>
+                            <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--secondary); margin-bottom: 10px;">${subject.name}</h3>
+                            <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px; line-height: 1.5;">Chọn đề thi ${subject.name} Lớp ${currentGrade} theo từng chủ đề.</p>
+                            <a href="#" onclick="loadSubjectTopics(${subject.id}, '${subject.name.replace(/'/g, "\\'")}'); return false;" class="btn btn-outline" style="width: 100%; border-radius: 16px; font-size: 0.9rem; padding: 10px 0;">Xem đề thi →</a>
+                        `;
+                        subjectGrid.appendChild(card);
+                    });
+                    if (window.refreshReveal) window.refreshReveal();
+                    else document.querySelectorAll('.stagger-reveal').forEach(el => el.classList.add('active'));
+                } else {
+                    subjectGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-gray);">Chưa có môn học nào.</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching subjects:', error);
+                subjectGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--danger);">Không thể kết nối đến máy chủ. Vui lòng tải lại trang.</div>';
+            }
+        }
+
+        async function loadSubjectTopics(subjectId, subjectName) {
+            const mainView = document.getElementById('exams-main-view');
+            const topicsView = document.getElementById('topics-view');
+            const container = document.getElementById('topics-container');
+            const titleEl = document.getElementById('topics-title');
+            const subtitleEl = document.getElementById('topics-subtitle');
+
+            titleEl.textContent = `Đề kiểm tra: ${subjectName} - Lớp ${currentGrade}`;
+            subtitleEl.textContent = `Chọn chủ đề bên dưới và nhấn "Vào thi" để bắt đầu bài kiểm tra có đếm ngược thời gian.`;
+            container.innerHTML = '<div style="text-align: center; padding: 45px; color: var(--text-gray);">Đang tải danh sách đề thi...</div>';
+
+            mainView.style.display = 'none';
+            topicsView.style.display = 'block';
+            // Bảo đảm nội dung hiện ngay cả khi IntersectionObserver chưa kịp chạy.
+            topicsView.classList.add('active');
+
+            try {
+                // Fetch topics & exam quizzes in parallel
+                const [topicsRes, quizzesRes] = await Promise.all([
+                    fetch(`${API_URL}/topics?subject_id=${subjectId}&grade=${currentGrade}`),
+                    fetch(`${API_URL}/quizzes/${subjectId}?grade=${currentGrade}`)
+                ]);
+                const topics = await topicsRes.json();
+                const quizzes = await quizzesRes.json();
+
+                container.innerHTML = '';
+
+                // Group quizzes by topic_id
+                const quizzesByTopic = {};
+                const generalQuizzes = [];
+                quizzes.forEach(q => {
+                    if (q.topic_id) {
+                        if (!quizzesByTopic[q.topic_id]) quizzesByTopic[q.topic_id] = [];
+                        quizzesByTopic[q.topic_id].push(q);
+                    } else {
+                        generalQuizzes.push(q);
+                    }
+                });
+
+                // ====== CASE: Môn chưa có chủ đề nào ======
+                if (topics.length === 0 && generalQuizzes.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 60px 40px; background: white; border-radius: 20px; border: 2px dashed #e2e8f0;">
+                            <span style="font-size: 3.5rem;">📂</span>
+                            <h3 style="margin-top: 18px; color: var(--secondary); font-size: 1.4rem;">Môn học này chưa có chủ đề</h3>
+                            <p style="color: var(--text-gray); margin-top: 10px; line-height: 1.6; max-width: 420px; margin-left: auto; margin-right: auto;">Admin chưa tạo chủ đề và đề kiểm tra cho môn học và lớp này. Vui lòng thử môn học khác hoặc quay lại sau khi nội dung được cập nhật.</p>
+                            <button class="btn btn-outline" onclick="showSubjectsView()" style="margin-top: 24px;">← Chọn môn khác</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // ====== CASE: Không có topics nhưng có quizzes tổng hợp ======
+                if (topics.length === 0 && generalQuizzes.length > 0) {
+                    const quizzesHtml = generalQuizzes.map(q => `
+                        <div class="quiz-list-item">
+                            <div class="quiz-info">
+                                <h4>${escapeHtml(q.title)}</h4>
+                                <div class="quiz-meta">
+                                    <span>⏱️ ${q.duration_minutes && q.duration_minutes > 0 ? q.duration_minutes + ' phút' : '15 phút'}</span>
+                                    <span class="exam-badge">⏳ Đếm ngược thời gian</span>
+                                </div>
+                            </div>
+                            <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                        </div>
+                    `).join('');
+                    const generalCard = document.createElement('div');
+                    generalCard.className = 'topic-card';
+                    generalCard.innerHTML = `
+                        <div class="topic-header" onclick="toggleTopicBody(this)">
+                            <div class="topic-title">
+                                <span style="font-size: 1.25rem;">📋</span>
+                                <span>Đề kiểm tra tổng hợp</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="topic-badge">${generalQuizzes.length} đề thi</span>
+                                <span class="topic-arrow" style="color: var(--text-gray); font-size: 0.8rem;">▼</span>
+                            </div>
+                        </div>
+                        <div class="topic-body">${quizzesHtml}</div>
+                    `;
+                    container.appendChild(generalCard);
+                    return;
+                }
+
+                // ====== CASE: Có topics → render từng topic ======
+                // Render each topic (show all topics, even empty ones)
+                topics.forEach(topic => {
+                    const topicQuizzes = quizzesByTopic[topic.id] || [];
+                    const topicCard = document.createElement('div');
+                    topicCard.className = 'topic-card';
+
+                    let quizzesHtml;
+                    if (topicQuizzes.length === 0) {
+                        quizzesHtml = '<div class="empty-topic-msg">Chưa có đề kiểm tra nào cho chủ đề này.</div>';
+                    } else {
+                        quizzesHtml = topicQuizzes.map(q => `
+                            <div class="quiz-list-item">
+                                <div class="quiz-info">
+                                    <h4>${escapeHtml(q.title)}</h4>
+                                    <div class="quiz-meta">
+                                        <span>⏱️ ${q.duration_minutes && q.duration_minutes > 0 ? q.duration_minutes + ' phút' : '15 phút'}</span>
+                                        <span class="exam-badge">⏳ Đếm ngược thời gian</span>
+                                    </div>
+                                </div>
+                                <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                            </div>
+                        `).join('');
+                    }
+
+                    topicCard.innerHTML = `
+                        <div class="topic-header" onclick="toggleTopicBody(this)">
+                            <div class="topic-title">
+                                <span style="font-size: 1.25rem;">📋</span>
+                                <span>${escapeHtml(topic.name)}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="topic-badge">${topicQuizzes.length} đề thi</span>
+                                <span class="topic-arrow" style="color: var(--text-gray); font-size: 0.8rem;">▼</span>
+                            </div>
+                        </div>
+                        <div class="topic-body">
+                            ${quizzesHtml}
+                        </div>
+                    `;
+                    container.appendChild(topicCard);
+                });
+
+                // Render general/unassigned quizzes at the bottom if topics exist
+                if (generalQuizzes.length > 0) {
+                    const generalCard = document.createElement('div');
+                    generalCard.className = 'topic-card';
+                    const quizzesHtml = generalQuizzes.map(q => `
+                        <div class="quiz-list-item">
+                            <div class="quiz-info">
+                                <h4>${escapeHtml(q.title)}</h4>
+                                <div class="quiz-meta">
+                                    <span>⏱️ ${q.duration_minutes && q.duration_minutes > 0 ? q.duration_minutes + ' phút' : '15 phút'}</span>
+                                    <span class="exam-badge">⏳ Đếm ngược thời gian</span>
+                                </div>
+                            </div>
+                            <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                        </div>
+                    `).join('');
+                    generalCard.innerHTML = `
+                        <div class="topic-header" onclick="toggleTopicBody(this)">
+                            <div class="topic-title">
+                                <span style="font-size: 1.25rem;">📋</span>
+                                <span>Đề kiểm tra tổng hợp</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="topic-badge">${generalQuizzes.length} đề thi</span>
+                                <span class="topic-arrow" style="color: var(--text-gray); font-size: 0.8rem;">▼</span>
+                            </div>
+                        </div>
+                        <div class="topic-body">${quizzesHtml}</div>
+                    `;
+                    container.appendChild(generalCard);
+                }
+
+            } catch (error) {
+                console.error('Error loading topics:', error);
+                container.innerHTML = '<div style="text-align: center; color: var(--danger); padding: 40px;">Không thể tải dữ liệu. Vui lòng thử lại.</div>';
+            }
+        }
+
+        function getSubjectIcon(slug) {
+            const icons = {
+                'toan': { emoji: '📐', color: 'orange' },
+                'ly':   { emoji: '⚡', color: 'red' },
+                'hoa':  { emoji: '🧪', color: 'yellow' },
+                'sinh': { emoji: '🧬', color: 'green' },
+                'su':   { emoji: '📜', color: 'blue' },
+                'dia':  { emoji: '🌍', color: 'purple' },
+                'van':  { emoji: '🖋️', color: 'brown' },
+                'tin':  { emoji: '💻', color: 'cyan' },
+                'anh':  { emoji: '🔤', color: 'red' }
+            };
+            return icons[slug] || { emoji: '📚', color: 'orange' };
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function initScrollReveal() {
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                        if (entry.target.classList.contains('reveal')) observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.reveal, .stagger-reveal').forEach(el => observer.observe(el));
+            window.refreshReveal = () => {
+                document.querySelectorAll('.reveal:not(.active), .stagger-reveal:not(.active)').forEach(el => observer.observe(el));
+            };
+        }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

@@ -17,6 +17,7 @@
         <div class="container">
             <div class="quiz-info">
                 <h2 id="quiz-title">Đang tải đề thi...</h2>
+                <div id="skill-progress-label" class="skill-progress-label" style="display: none;">Đã làm đúng 0/0 câu</div>
                 <div class="progress-container">
                     <div class="progress-bar" id="progress-bar"></div>
                 </div>
@@ -37,6 +38,14 @@
         </div>
     </main>
 
+    <aside class="instant-ai-feedback" id="instant-ai-feedback" aria-live="polite" aria-atomic="true">
+        <div class="instant-ai-avatar">🤖</div>
+        <div class="instant-ai-bubble">
+            <strong id="instant-ai-title">EduBot</strong>
+            <p id="instant-ai-message">Cùng chinh phục câu tiếp theo nhé!</p>
+        </div>
+    </aside>
+
     <!-- Result Modal -->
     <div class="modal-overlay" id="result-modal">
         <div class="result-modal">
@@ -53,7 +62,7 @@
                 <button onclick="analyzeAI()" class="btn btn-ai" id="ai-btn">
                     <span class="ai-sparkle">✨</span> Phân tích & Lộ trình
                 </button>
-                <button onclick="loadAnotherQuiz()" class="btn btn-secondary">Làm đề khác</button>
+                <button onclick="loadAnotherQuiz()" class="btn btn-secondary" id="another-quiz-btn">Làm đề khác</button>
                 <a href="index.html" class="btn btn-primary">Về trang chủ</a>
             </div>
 

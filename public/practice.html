@@ -3,270 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luyện tập không giới hạn thời gian - Edu-Flow</title>
+    <title>Luyện tập tự do - EduFlow</title>
+    <meta name="description" content="Luyện tập tự do theo môn học và chủ đề, không khóa bài và không giới hạn thời gian.">
     <link rel="stylesheet" href="style.css">
     <script src="theme.js"></script>
     <style>
+        body { background: #f8fafc; }
         .practice-header {
-            background: linear-gradient(135deg, #FF8A00 0%, #E67E00 100%);
-            padding: 80px 0;
-            color: white;
-            border-radius: 0 0 50px 50px;
-            margin-bottom: 50px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(255, 122, 0, 0.15);
+            padding: 64px 0 82px; text-align: center; color: white;
+            border-radius: 0 0 46px 46px;
+            background: radial-gradient(circle at 80% 20%, rgba(255,255,255,.18), transparent 28%), linear-gradient(135deg, #ff8a00, #ea580c);
+            box-shadow: 0 20px 50px rgba(234,88,12,.2);
         }
-        .practice-header::before {
-            content: '';
-            position: absolute;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
-            top: -100px;
-            right: -100px;
-            border-radius: 50%;
+        .practice-header h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin-bottom: 12px; }
+        .practice-header p { max-width: 650px; margin: auto; line-height: 1.7; opacity: .94; }
+        .practice-container { margin-top: -36px; padding-bottom: 90px; position: relative; }
+        .practice-info {
+            background: white; padding: 28px 32px; border-radius: 26px; margin-bottom: 42px;
+            display: flex; align-items: center; gap: 22px;
+            border: 1px solid #e8edf4; box-shadow: 0 18px 45px rgba(15,23,42,.07);
         }
-        .practice-container {
-            padding-bottom: 100px;
-        }
-        .practice-info-card {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: 40px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.03);
-            margin-bottom: 50px;
-            border: 1px solid rgba(255, 122, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 30px;
-        }
-        .practice-info-icon {
-            font-size: 50px;
-            background: var(--primary-soft);
-            width: 90px;
-            height: 90px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 24px;
-            color: var(--primary);
-            flex-shrink: 0;
-        }
-        .practice-info-text h3 {
-            color: var(--secondary);
-            font-size: 1.4rem;
-            margin-bottom: 8px;
-            font-weight: 800;
-        }
-        .practice-info-text p {
-            color: var(--text-gray);
-            line-height: 1.6;
-        }
-        @media (max-width: 768px) {
-            .practice-info-card {
-                flex-direction: column;
-                text-align: center;
-                padding: 30px 20px;
-            }
+        .practice-info-icon { width: 70px; height: 70px; flex: 0 0 70px; display: grid; place-items: center; border-radius: 22px; background: #fff7ed; font-size: 34px; }
+        .practice-info h2 { color: var(--secondary); font-size: 1.35rem; margin-bottom: 6px; }
+        .practice-info p { color: var(--text-gray); line-height: 1.6; }
+        .subject-heading { text-align: center; margin-bottom: 32px; }
+        .subject-heading h2 { color: var(--secondary); font-size: 2rem; margin-bottom: 8px; }
+        .subject-heading p { color: var(--text-gray); }
+        .grade-selector { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+        .subject-card { cursor: pointer; }
+        .subject-card .link { pointer-events: none; }
+        .btn-back { background: white; color: #334155; border: 1px solid #d9e2ec; padding: 10px 18px; border-radius: 13px; font-weight: 700; cursor: pointer; margin-bottom: 24px; }
+        .topic-page-title { margin-bottom: 28px; }
+        .topic-page-title h2 { color: var(--secondary); font-size: 2rem; margin-bottom: 6px; }
+        .topic-page-title p { color: var(--text-gray); }
+        .topics-list { display: grid; gap: 18px; }
+        .topic-card { background: white; border: 1px solid #e2e8f0; border-radius: 22px; overflow: hidden; box-shadow: 0 9px 28px rgba(15,23,42,.05); }
+        .topic-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; gap: 15px; background: #fffaf5; cursor: pointer; }
+        .topic-header h3 { color: #1e293b; font-size: 1.08rem; display: flex; align-items: center; gap: 10px; }
+        .topic-count { color: #c2410c; background: #ffedd5; border-radius: 999px; padding: 5px 11px; font-size: .78rem; font-weight: 800; white-space: nowrap; }
+        .topic-body { padding: 16px 20px 20px; display: grid; gap: 12px; }
+        .quiz-item { padding: 16px 18px; border: 1px solid #edf1f5; border-radius: 16px; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+        .quiz-item h4 { color: #1e293b; margin-bottom: 5px; }
+        .quiz-meta { color: #64748b; font-size: .82rem; }
+        .empty-message { text-align: center; padding: 55px 25px; background: white; border: 2px dashed #dbe3ec; border-radius: 22px; color: #64748b; }
+        .empty-message span { display: block; font-size: 46px; margin-bottom: 12px; }
+        [data-theme="dark"] body { background: #0b1120; }
+        [data-theme="dark"] .practice-info, [data-theme="dark"] .topic-card, [data-theme="dark"] .empty-message { background: #172033; border-color: #334155; }
+        [data-theme="dark"] .topic-header { background: #1c2739; }
+        [data-theme="dark"] .quiz-item { background: #111c2f; border-color: #334155; }
+        [data-theme="dark"] .practice-info h2, [data-theme="dark"] .subject-heading h2, [data-theme="dark"] .topic-page-title h2, [data-theme="dark"] .topic-header h3, [data-theme="dark"] .quiz-item h4 { color: #f8fafc; }
+        @media (max-width: 700px) {
+            .practice-info { align-items: flex-start; padding: 22px 18px; }
+            .quiz-item { align-items: flex-start; flex-direction: column; }
+            .quiz-item .btn { width: 100%; text-align: center; }
         }
     </style>
 </head>
-<body style="background: #F8FAFC;">
+<body>
     <nav class="navbar">
         <div class="container">
             <a href="index.html" class="logo">Edu<span>Flow</span></a>
-            <ul class="nav-links" id="nav-links">
-                <!-- Injected by JS -->
-            </ul>
+            <ul class="nav-links" id="nav-links"></ul>
         </div>
     </nav>
 
     <header class="practice-header">
         <div class="container">
-            <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 15px;">Luyện tập tự do</h1>
-            <p style="font-size: 1.1rem; opacity: 0.95; max-width: 600px; margin: 0 auto;">Rèn luyện kiến thức vững vàng với kho đề thi đa dạng, hoàn toàn không giới hạn thời gian làm bài.</p>
+            <h1>📚 Luyện tập tự do</h1>
+            <p>Chọn bất kỳ môn học, chủ đề và bài tập nào bạn muốn. Không khóa tuần tự và không giới hạn thời gian.</p>
         </div>
     </header>
 
     <main class="container practice-container">
-
-        <section class="reveal">
-            <div class="section-header" style="margin-bottom: 50px;">
-                <h2 style="font-size: 2rem; font-weight: 800;">Chọn môn học để bắt đầu luyện tập</h2>
-                <p style="font-size: 0.95rem; margin-top: 10px;">Lọc bài ôn luyện theo cấp lớp phù hợp với bạn:</p>
-                
-                <!-- Grade Selection -->
-                <div class="grade-selector" style="margin-top: 25px;">
+        <section id="subjects-view">
+            <div class="practice-info">
+                <div class="practice-info-icon">🎯</div>
+                <div><h2>Ôn đúng phần bạn đang cần</h2><p>Tab này dành cho luyện tập tự do. Nếu muốn học tuần tự và mở khóa từng chặng, hãy chuyển sang Bản đồ học tập.</p></div>
+            </div>
+            <div class="subject-heading">
+                <h2>Chọn môn học</h2>
+                <p>Lọc nội dung theo khối lớp phù hợp với bạn.</p>
+                <div class="grade-selector">
                     <button class="btn btn-outline grade-btn" data-grade="10" onclick="selectGrade(10)">Lớp 10</button>
                     <button class="btn btn-outline grade-btn" data-grade="11" onclick="selectGrade(11)">Lớp 11</button>
                     <button class="btn btn-primary grade-btn" data-grade="12" onclick="selectGrade(12)">Lớp 12</button>
                 </div>
             </div>
+            <div class="subject-grid" id="subject-grid"><div style="grid-column:1/-1;text-align:center;padding:45px;color:var(--text-gray);">Đang tải danh sách môn học...</div></div>
+        </section>
 
-            <div class="subject-grid" id="subject-grid">
-                <!-- Subjects injected by JS -->
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-gray);">
-                    Đang tải danh sách môn học...
-                </div>
+        <section id="topics-view" style="display:none;">
+            <button class="btn-back" onclick="showSubjectsView()">← Chọn môn khác</button>
+            <div class="topic-page-title">
+                <h2 id="topics-title">Bài luyện tập</h2>
+                <p>Chọn một bài bất kỳ để bắt đầu. Kết quả vẫn được lưu vào hồ sơ học tập.</p>
             </div>
+            <div class="topics-list" id="topics-list"></div>
         </section>
     </main>
 
-    <footer class="footer">
-        <div class="container">
-            <a href="index.html" class="logo">Edu<span>Flow</span></a>
-            <p>&copy; 2026 Edu-Flow Platform. Mang lại kiến thức cho mọi người.</p>
-        </div>
-    </footer>
+    <footer class="footer"><div class="container"><a href="index.html" class="logo">Edu<span>Flow</span></a><p>&copy; 2026 EduFlow. Luyện tập mỗi ngày, tiến bộ mỗi ngày.</p></div></footer>
 
     <script>
-        const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
+        const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:') ? 'http://localhost:5000/api' : '/api';
         let currentGrade = 12;
+        let subjects = [];
+        let currentSubject = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = 'auth.html';
-                return;
-            }
-
+            if (!localStorage.getItem('token')) { location.href = 'auth.html'; return; }
             updateNavbar();
-            await checkUserGrade();
-            fetchSubjects();
-            initScrollReveal();
+            await loadUserGrade();
+            const params = new URLSearchParams(location.search);
+            const grade = Number(params.get('grade'));
+            if ([10,11,12].includes(grade)) currentGrade = grade;
+            updateGradeButtons();
+            await loadSubjects();
+            const subjectId = Number(params.get('subject'));
+            if (subjectId) openPracticeById(subjectId, false);
         });
 
         function updateNavbar() {
-            const navLinks = document.getElementById('nav-links');
-            const user = JSON.parse(localStorage.getItem('user'));
-            if (user) {
-                navLinks.innerHTML = `
-                    <li><a href="index.html#subjects">Kiểm tra</a></li>
-                    <li><a href="practice.html" style="color: var(--primary); font-weight: 700;">Luyện tập</a></li>
-                    <li><a href="roadmap.html">Lộ trình</a></li>
-                    <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
-                    <li><a href="profile.html" class="btn btn-outline" style="padding: 8px 18px; border-radius: 12px;">Trang cá nhân</a></li>
-                    <li><a href="#" onclick="logout()" class="btn btn-primary" style="padding: 8px 18px; border-radius: 12px;">Đăng xuất</a></li>
-                `;
-            }
+            document.getElementById('nav-links').innerHTML = `
+                <li><a href="index.html#subjects">Kiểm tra</a></li>
+                <li><a href="practice.html" style="color:var(--primary);font-weight:800;">Luyện tập</a></li>
+                <li><a href="skill-tree.html">Bản đồ học tập</a></li>
+                <li><a href="roadmap.html">Lộ trình AI</a></li>
+                <li><a href="leaderboard.html">Bảng xếp hạng</a></li>
+                <li><a href="profile.html" class="btn btn-outline" style="padding:8px 16px;">Trang cá nhân</a></li>
+                <li><a href="#" onclick="logout();return false;" class="btn btn-primary" style="padding:8px 16px;">Đăng xuất</a></li>`;
         }
 
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = 'index.html';
+        function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); location.href = 'index.html'; }
+
+        async function loadUserGrade() {
+            try {
+                const response = await fetch(`${API_URL}/auth/user`, { headers: { 'x-auth-token': localStorage.getItem('token') } });
+                if (!response.ok) return;
+                const user = await response.json();
+                const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : user.survey_data;
+                const grade = Number(survey?.grade);
+                if ([10,11,12].includes(grade)) currentGrade = grade;
+            } catch (error) { console.error(error); }
         }
 
-        async function checkUserGrade() {
-            const token = localStorage.getItem('token');
-            if (token) {
-                try {
-                    const res = await fetch(`${API_URL}/auth/user`, {
-                        headers: { 'x-auth-token': token }
-                    });
-                    if (res.ok) {
-                        const user = await res.json();
-                        if (user.survey_data) {
-                            const survey = typeof user.survey_data === 'string' ? JSON.parse(user.survey_data) : user.survey_data;
-                            if (survey.grade) {
-                                currentGrade = parseInt(survey.grade);
-                                selectGrade(currentGrade);
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error checking user grade:", err);
-                }
-            }
-        }
-
-        function selectGrade(grade) {
-            currentGrade = grade;
-            document.querySelectorAll('.grade-btn').forEach(btn => {
-                if (btn.getAttribute('data-grade') == grade) {
-                    btn.classList.remove('btn-outline');
-                    btn.classList.add('btn-primary');
-                } else {
-                    btn.classList.add('btn-outline');
-                    btn.classList.remove('btn-primary');
-                }
-            });
-            fetchSubjects();
-        }
-
-        async function fetchSubjects() {
-            const subjectGrid = document.getElementById('subject-grid');
+        async function loadSubjects() {
+            const grid = document.getElementById('subject-grid');
             try {
                 const response = await fetch(`${API_URL}/subjects`);
-                const subjects = await response.json();
+                const data = await response.json();
+                if (!response.ok || !Array.isArray(data)) throw new Error(data.msg || 'Không thể tải môn học.');
+                subjects = data;
+                grid.innerHTML = data.map(subject => {
+                    const icon = getSubjectIcon(subject.slug);
+                    return `<article class="subject-card active" onclick="openPracticeById(${subject.id})">
+                        <div class="subject-icon ${icon.color}">${icon.emoji}</div><h3>${escapeHtml(subject.name)}</h3>
+                        <p>Luyện tập ${escapeHtml(subject.name)} lớp ${currentGrade} theo từng chủ đề.</p><span class="link">Chọn bài luyện →</span>
+                    </article>`;
+                }).join('');
+            } catch (error) { grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--danger);">${escapeHtml(error.message)}</div>`; }
+        }
 
-                if (subjects.length > 0) {
-                    subjectGrid.innerHTML = '';
-                    subjects.forEach((subject, index) => {
-                        const card = document.createElement('div');
-                        card.className = 'subject-card stagger-reveal';
-                        card.style.transitionDelay = `${index * 0.1}s`;
-                        
-                        const icon = getSubjectIcon(subject.slug);
-                        
-                        card.innerHTML = `
-                            <div class="subject-icon ${icon.color}">${icon.emoji}</div>
-                            <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--secondary); margin-bottom: 10px;">${subject.name}</h3>
-                            <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px; line-height: 1.5;">Luyện tập đề trắc nghiệm ${subject.name} Lớp ${currentGrade} không tính giờ.</p>
-                            <a href="#" onclick="startPractice(${subject.id})" class="btn btn-outline" style="width: 100%; border-radius: 16px; font-size: 0.9rem; padding: 10px 0;">Luyện tập ngay →</a>
-                        `;
-                        subjectGrid.appendChild(card);
-                    });
-                    
-                    if (window.refreshReveal) {
-                        window.refreshReveal();
-                    } else {
-                        document.querySelectorAll('.reveal, .stagger-reveal').forEach(el => el.classList.add('active'));
-                    }
+        function selectGrade(grade) { currentGrade = grade; updateGradeButtons(); loadSubjects(); }
+        function updateGradeButtons() {
+            document.querySelectorAll('.grade-btn').forEach(button => {
+                const active = Number(button.dataset.grade) === currentGrade;
+                button.classList.toggle('btn-primary', active); button.classList.toggle('btn-outline', !active);
+            });
+        }
+
+        function openPracticeById(subjectId, updateUrl = true) {
+            const subject = subjects.find(item => Number(item.id) === Number(subjectId));
+            if (!subject) return;
+            currentSubject = subject;
+            document.getElementById('subjects-view').style.display = 'none';
+            document.getElementById('topics-view').style.display = 'block';
+            document.getElementById('topics-title').textContent = `${subject.name} · Lớp ${currentGrade}`;
+            if (updateUrl) history.pushState({}, '', `practice.html?subject=${subject.id}&grade=${currentGrade}`);
+            loadTopicsAndQuizzes();
+        }
+
+        async function loadTopicsAndQuizzes() {
+            const list = document.getElementById('topics-list');
+            list.innerHTML = '<div class="empty-message"><span>⏳</span>Đang tải bài luyện tập...</div>';
+            try {
+                const [topicsResponse, quizzesResponse] = await Promise.all([
+                    fetch(`${API_URL}/topics?subject_id=${currentSubject.id}&grade=${currentGrade}`),
+                    fetch(`${API_URL}/quizzes/${currentSubject.id}?grade=${currentGrade}`)
+                ]);
+                const topics = await topicsResponse.json();
+                const quizzes = await quizzesResponse.json();
+                if (!topicsResponse.ok || !quizzesResponse.ok || !Array.isArray(topics) || !Array.isArray(quizzes)) throw new Error('Không thể tải nội dung luyện tập.');
+
+                const grouped = new Map(topics.map(topic => [Number(topic.id), { topic, quizzes: [] }]));
+                const general = [];
+                quizzes.forEach(quiz => grouped.has(Number(quiz.topic_id)) ? grouped.get(Number(quiz.topic_id)).quizzes.push(quiz) : general.push(quiz));
+                const groups = [...grouped.values()].filter(group => group.quizzes.length);
+                if (general.length) groups.push({ topic: { name: 'Ôn tập tổng hợp' }, quizzes: general });
+                if (!groups.length) {
+                    list.innerHTML = '<div class="empty-message"><span>📭</span><h3>Chưa có bài luyện tập</h3><p>Admin chưa tạo đề cho môn học và lớp này.</p></div>';
+                    return;
                 }
-            } catch (error) {
-                console.error('Error fetching subjects:', error);
-                subjectGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--danger);">Không thể kết nối đến máy chủ. Vui lòng tải lại trang.</div>';
-            }
+                list.innerHTML = groups.map((group, index) => renderTopicGroup(group, index)).join('');
+            } catch (error) { list.innerHTML = `<div class="empty-message"><span>⚠️</span>${escapeHtml(error.message)}</div>`; }
         }
 
-        function startPractice(subjectId) {
-            window.location.href = `quiz.html?subject=${subjectId}&grade=${currentGrade}&mode=practice`;
+        function renderTopicGroup(group, index) {
+            const quizzes = group.quizzes.map(quiz => `<div class="quiz-item"><div><h4>${escapeHtml(quiz.title)}</h4><div class="quiz-meta">📖 Không giới hạn thời gian · Kết quả được lưu</div></div><a class="btn btn-primary" href="quiz.html?id=${quiz.id}&mode=practice&subject=${currentSubject.id}&grade=${currentGrade}&source=practice">Luyện ngay →</a></div>`).join('');
+            return `<article class="topic-card"><div class="topic-header" onclick="toggleTopic(${index})"><h3>📌 ${escapeHtml(group.topic.name)}</h3><span class="topic-count">${group.quizzes.length} bài</span></div><div class="topic-body" id="topic-body-${index}">${quizzes}</div></article>`;
         }
 
-        function getSubjectIcon(slug) {
-            const icons = {
-                'toan': { emoji: '📐', color: 'orange' },
-                'ly': { emoji: '⚡', color: 'red' },
-                'hoa': { emoji: '🧪', color: 'yellow' },
-                'sinh': { emoji: '🧬', color: 'green' },
-                'su': { emoji: '📜', color: 'blue' },
-                'dia': { emoji: '🌍', color: 'purple' },
-                'van': { emoji: '🖋️', color: 'brown' },
-                'tin': { emoji: '💻', color: 'cyan' },
-                'anh': { emoji: '🔤', color: 'red' }
-            };
-            return icons[slug] || { emoji: '📚', color: 'orange' };
-        }
-
-        function initScrollReveal() {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('active');
-                    }
-                });
-            }, { threshold: 0.1 });
-
-            document.querySelectorAll('.reveal, .stagger-reveal').forEach(el => observer.observe(el));
-            
-            window.refreshReveal = () => {
-                document.querySelectorAll('.reveal:not(.active), .stagger-reveal:not(.active)').forEach(el => observer.observe(el));
-            };
-        }
+        function toggleTopic(index) { const body = document.getElementById(`topic-body-${index}`); body.style.display = body.style.display === 'none' ? 'grid' : 'none'; }
+        function showSubjectsView() { currentSubject = null; document.getElementById('topics-view').style.display = 'none'; document.getElementById('subjects-view').style.display = 'block'; history.pushState({}, '', 'practice.html'); }
+        function getSubjectIcon(slug) { return ({ toan:{emoji:'📐',color:'orange'},ly:{emoji:'⚡',color:'red'},hoa:{emoji:'🧪',color:'yellow'},sinh:{emoji:'🧬',color:'green'},su:{emoji:'📜',color:'blue'},dia:{emoji:'🌍',color:'purple'},van:{emoji:'🖋️',color:'brown'},tin:{emoji:'💻',color:'cyan'},anh:{emoji:'🔤',color:'red'} })[slug] || {emoji:'📚',color:'orange'}; }
+        function escapeHtml(value) { return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
     </script>
-    <script type="module" src="main.js"></script>
 </body>
 </html>

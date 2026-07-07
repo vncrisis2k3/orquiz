@@ -440,7 +440,8 @@
             <ul class="sidebar-nav">
                 <li class="active" onclick="showSection('dashboard', this)">📊 Dashboard</li>
                 <li onclick="showSection('users', this)">👥 Quản lý User</li>
-                <li onclick="showSection('quizzes', this)">📝 Quản lý Đề thi</li>
+                <li onclick="showSection('topics', this)">📁 Quản lý chủ đề</li>
+                <li onclick="showSection('quizzes', this)">📋 Quản lý đề thi</li>
                 <li onclick="showSection('scan', this)">📄 Quét file PDF</li>
                 <li onclick="showSection('ai-gen', this)">✨ Tạo đề bằng AI</li>
                 <li onclick="startNewManualQuiz(this)">✍️ Tạo đề thủ công</li>
@@ -522,17 +523,66 @@
                 </div>
             </section>
 
+            <section id="section-topics" class="admin-section">
+                <div class="tool-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 10px;">
+                        <div>
+                            <h2 style="color: var(--primary); margin-bottom: 8px;">📁 Quản lý chủ đề</h2>
+                            <p style="color: var(--text-gray);">Thêm, xem, sửa và xóa chủ đề theo từng môn học và khối lớp.</p>
+                        </div>
+                        <button class="btn btn-outline" onclick="loadManagedTopics()">Làm mới</button>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 2fr auto; gap: 20px; align-items: flex-end; margin: 28px 0;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Môn học</label>
+                            <select id="topic-mgr-subject" class="subject-select" onchange="handleTopicFilterChange()" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Lớp</label>
+                            <select id="topic-mgr-grade" onchange="handleTopicFilterChange()" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                                <option value="10">Lớp 10</option>
+                                <option value="11">Lớp 11</option>
+                                <option value="12" selected>Lớp 12</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label id="topic-mgr-name-label">Tên chủ đề mới</label>
+                            <input type="text" id="topic-mgr-name" placeholder="Nhập tên chủ đề..." onkeydown="if(event.key === 'Enter') addTopicFromMgr()" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="topic-mgr-cancel" class="btn btn-outline" onclick="cancelTopicEdit()" style="display: none; padding: 12px 20px; border-radius: 10px;">Hủy</button>
+                            <button id="topic-mgr-save" class="btn btn-primary" onclick="addTopicFromMgr()" style="padding: 12px 25px; border-radius: 10px; white-space: nowrap;">+ Thêm chủ đề</button>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="ranking-table">
+                            <thead>
+                                <tr><th>ID</th><th>Tên chủ đề</th><th>Môn học</th><th>Lớp</th><th style="text-align: right;">Thao tác</th></tr>
+                            </thead>
+                            <tbody id="managed-topics-list">
+                                <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-gray);">Đang tải danh sách chủ đề...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <section id="section-quizzes" class="admin-section">
+                <!-- All Quizzes List -->
                 <div class="tool-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                        <h2>Danh sách đề thi</h2>
-                        <button class="btn btn-primary" onclick="showSection('scan')">+ Tạo đề mới</button>
+                        <h2>📋 Danh sách Đề thi</h2>
+                        <button class="btn btn-primary" onclick="startNewManualQuiz(null)">+ Tạo đề thi mới</button>
                     </div>
                     <table class="ranking-table">
                         <thead>
-                            <tr><th>ID</th><th>Tiêu đề</th><th>Môn học</th><th style="text-align: right;">Thao tác</th></tr>
+                            <tr><th>ID</th><th>Tiêu đề</th><th>Môn học</th><th>Chủ đề</th><th>Thời gian</th><th style="text-align: right;">Thao tác</th></tr>
                         </thead>
-                        <tbody id="admin-quizzes-list"></tbody>
+                        <tbody id="admin-quizzes-list">
+                            <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-gray);">Đang tải danh sách đề thi...</td></tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
@@ -541,20 +591,28 @@
                 <div class="tool-card">
                     <h2>Quét đề từ file PDF/Word</h2>
                     <p style="color: var(--text-gray); margin-bottom: 30px;">Tự động nhận diện câu hỏi từ tài liệu ôn tập của bạn.</p>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div class="form-group">
                             <label>Môn học</label>
-                            <select id="scan-subject" class="subject-select" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;"></select>
+                            <select id="scan-subject" class="subject-select" onchange="loadScanFormTopics()" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;"></select>
                         </div>
                         <div class="form-group">
                             <label>Lớp</label>
-                            <select id="scan-grade" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
+                            <select id="scan-grade" onchange="loadScanFormTopics()" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
                                 <option value="10">Lớp 10</option>
                                 <option value="11">Lớp 11</option>
                                 <option value="12" selected>Lớp 12</option>
                             </select>
                         </div>
-                        <div class="form-group">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                        <div class="form-group" id="scan-topic-group">
+                            <label>Chủ đề môn học</label>
+                            <select id="scan-topic" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
+                                <option value="">-- Chọn chủ đề (Không bắt buộc) --</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="scan-duration-group">
                             <label>Thời gian (phút)</label>
                             <input type="number" id="scan-duration" value="15" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
                         </div>
@@ -579,14 +637,14 @@
                         <p style="font-size: 0.9rem; color: #991b1b;">AI sẽ tạo ra các câu hỏi trắc nghiệm đa dạng bao gồm cả mức độ nhận biết, thông hiểu, vận dụng và vận dụng cao.</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div class="form-group">
                             <label>Môn học mục tiêu</label>
-                            <select id="ai-subject" class="subject-select" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;"></select>
+                            <select id="ai-subject" class="subject-select" onchange="loadAiFormTopics()" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;"></select>
                         </div>
                         <div class="form-group">
                             <label>Khối lớp</label>
-                            <select id="ai-grade" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
+                            <select id="ai-grade" onchange="loadAiFormTopics()" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
                                 <option value="10">Lớp 10</option>
                                 <option value="11">Lớp 11</option>
                                 <option value="12" selected>Lớp 12</option>
@@ -598,6 +656,14 @@
                                 <option value="10">10 câu (Cấp tốc)</option>
                                 <option value="20" selected>20 câu (Chuẩn)</option>
                                 <option value="40">40 câu (Đầy đủ)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 30px;">
+                        <div class="form-group">
+                            <label>Chủ đề môn học</label>
+                            <select id="ai-topic" style="width:100%; padding:14px; border-radius:12px; border:1px solid #ddd;">
+                                <option value="">-- Chọn chủ đề (Không bắt buộc) --</option>
                             </select>
                         </div>
                     </div>
@@ -630,20 +696,28 @@
                             </div>
                             <div class="form-group">
                                 <label>Môn học</label>
-                                <select id="man-subject" class="subject-select" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;"></select>
+                                <select id="man-subject" class="subject-select" onchange="loadManualFormTopics()" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;"></select>
                             </div>
                             <div class="form-group">
                                 <label>Lớp</label>
-                                <select id="man-grade" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                                <select id="man-grade" onchange="loadManualFormTopics()" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
                                     <option value="10">Lớp 10</option>
                                     <option value="11">Lớp 11</option>
                                     <option value="12" selected>Lớp 12</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-top: 15px;">
-                            <label>Thời gian (phút)</label>
-                            <input type="number" id="man-duration" value="15" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                            <div class="form-group" id="man-topic-group">
+                                <label>Chủ đề môn học</label>
+                                <select id="man-topic" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                                    <option value="">-- Chọn chủ đề (Không bắt buộc) --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="man-duration-group">
+                                <label>Thời gian (phút)</label>
+                                <input type="number" id="man-duration" value="15" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
+                            </div>
                         </div>
                     </div>
 
@@ -831,19 +905,34 @@
                 const quizzes = await res.json();
                 if (!Array.isArray(quizzes)) return;
                 adminQuizzes = quizzes;
+                
+                const statDashboardQuizzes = document.getElementById('stat-dashboard-quizzes');
+                if (statDashboardQuizzes) statDashboardQuizzes.textContent = quizzes.length;
+                
                 const statQuizzes = document.getElementById('stat-quizzes');
                 if (statQuizzes) statQuizzes.textContent = quizzes.length;
-                document.getElementById('admin-quizzes-list').innerHTML = quizzes.map(q => `
-                    <tr>
-                        <td>${q.id}</td>
-                        <td><b>${escapeHtml(String(q.title || '').normalize('NFC'))}</b></td>
-                        <td><span class="rank-badge" style="width: auto; padding: 5px 15px; border-radius: 20px; font-size: 12px; background: rgba(255,122,0,0.1); color: var(--primary);">${escapeHtml(String(q.subject_name || '').normalize('NFC'))}</span></td>
-                        <td style="text-align: right;">
-                            <button onclick="editQuiz(${q.id})" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 18px; margin-right: 10px;" title="Sửa đề thi">✏️</button>
-                            <button onclick="deleteQuiz(${q.id})" style="background: none; border: none; color: #f87171; cursor: pointer; font-size: 18px;" title="Xóa đề thi">🗑️</button>
-                        </td>
-                    </tr>
-                `).join('');
+
+                // Populate Quizzes Table
+                const listEl = document.getElementById('admin-quizzes-list');
+                if (listEl) {
+                    if (quizzes.length === 0) {
+                        listEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-gray);">Không có đề thi nào.</td></tr>`;
+                    } else {
+                        listEl.innerHTML = quizzes.map(q => `
+                            <tr>
+                                <td>${q.id}</td>
+                                <td><b>${escapeHtml(String(q.title || '').normalize('NFC'))}</b></td>
+                                <td><span class="rank-badge" style="width: auto; padding: 5px 15px; border-radius: 20px; font-size: 12px; background: rgba(255,122,0,0.1); color: var(--primary);">${escapeHtml(String(q.subject_name || '').normalize('NFC'))} Lớp ${q.grade || 12}</span></td>
+                                <td><span style="font-weight: 600; color: var(--secondary);">${escapeHtml(String(q.topic_name || 'Khác').normalize('NFC'))}</span></td>
+                                <td>⏱️ ${q.duration_minutes || 15} phút</td>
+                                <td style="text-align: right;">
+                                    <button onclick="editQuiz(${q.id})" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 18px; margin-right: 10px;" title="Sửa đề thi">✏️</button>
+                                    <button onclick="deleteQuiz(${q.id})" style="background: none; border: none; color: #f87171; cursor: pointer; font-size: 18px;" title="Xóa đề thi">🗑️</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+                }
             } catch (err) { console.error(err); }
         }
 
@@ -857,19 +946,260 @@
                 document.querySelectorAll('.subject-select').forEach(select => {
                     select.innerHTML = options;
                 });
+
+                // Now load topics for forms
+                await loadManagedTopics();
+                await loadManualFormTopics();
+                await loadScanFormTopics();
+                await loadAiFormTopics();
             } catch (err) { console.error("Load subjects error", err); }
         }
 
         function showSection(name, element) {
             document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.sidebar-nav li').forEach(l => l.classList.remove('active'));
-            document.getElementById(`section-${name}`).classList.add('active');
+            
+            const targetSection = document.getElementById(`section-${name}`);
+            if (targetSection) targetSection.classList.add('active');
             if (element) element.classList.add('active');
             
             if (name === 'dashboard') {
                 loadDashboardStats();
             } else if (name === 'settings') {
                 loadGeminiSettings();
+            } else if (name === 'topics') {
+                loadManagedTopics();
+            } else if (name === 'quizzes') {
+                loadQuizzes();
+            }
+        }
+
+        // Topic Management functions
+        let managedTopics = [];
+        let editingTopicId = null;
+
+        function handleTopicFilterChange() {
+            loadManagedTopics();
+        }
+
+        async function loadManagedTopics() {
+            const subjectSelect = document.getElementById('topic-mgr-subject');
+            const gradeSelect = document.getElementById('topic-mgr-grade');
+            const listEl = document.getElementById('managed-topics-list');
+            if (!subjectSelect || !gradeSelect || !listEl) return;
+
+            const subjectId = subjectSelect.value;
+            const grade = gradeSelect.value;
+            if (!subjectId) return;
+            
+            listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-gray);">Đang tải danh sách chủ đề...</td></tr>';
+            
+            try {
+                const res = await fetch(`${API_URL}/topics?subject_id=${subjectId}&grade=${grade}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || 'Không thể tải danh sách chủ đề.');
+                managedTopics = Array.isArray(data) ? data : [];
+                 
+                if (managedTopics.length === 0) {
+                    listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-gray);">Chưa có chủ đề nào cho môn học và lớp này.</td></tr>';
+                    return;
+                }
+
+                const subjectName = subjectSelect.options[subjectSelect.selectedIndex]?.text || '';
+                listEl.innerHTML = managedTopics.map(t => `
+                    <tr>
+                        <td>${t.id}</td>
+                        <td><b>${escapeHtml(t.name)}</b></td>
+                        <td>${escapeHtml(subjectName)}</td>
+                        <td><span class="rank-badge" style="width: auto; padding: 5px 14px; border-radius: 20px;">Lớp ${t.grade}</span></td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <button onclick="startTopicEdit(${t.id})" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 18px; margin-right: 12px;" title="Sửa chủ đề">✏️</button>
+                            <button onclick="deleteTopicFromMgr(${t.id})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px;" title="Xóa chủ đề">🗑️</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+                managedTopics = [];
+                listEl.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
+            }
+        }
+
+        function startTopicEdit(id) {
+            const topic = managedTopics.find(item => Number(item.id) === Number(id));
+            if (!topic) return;
+
+            editingTopicId = topic.id;
+            document.getElementById('topic-mgr-name').value = topic.name;
+            document.getElementById('topic-mgr-name-label').textContent = 'Tên chủ đề sau khi sửa';
+            document.getElementById('topic-mgr-save').textContent = '💾 Lưu thay đổi';
+            document.getElementById('topic-mgr-cancel').style.display = 'inline-flex';
+            document.getElementById('topic-mgr-name').focus();
+        }
+
+        function cancelTopicEdit() {
+            editingTopicId = null;
+            const nameInput = document.getElementById('topic-mgr-name');
+            const nameLabel = document.getElementById('topic-mgr-name-label');
+            const saveButton = document.getElementById('topic-mgr-save');
+            const cancelButton = document.getElementById('topic-mgr-cancel');
+            if (nameInput) nameInput.value = '';
+            if (nameLabel) nameLabel.textContent = 'Tên chủ đề mới';
+            if (saveButton) saveButton.textContent = '+ Thêm chủ đề';
+            if (cancelButton) cancelButton.style.display = 'none';
+        }
+
+        async function addTopicFromMgr() {
+            const subjectId = document.getElementById('topic-mgr-subject').value;
+            const grade = document.getElementById('topic-mgr-grade').value;
+            const nameInput = document.getElementById('topic-mgr-name');
+            const name = nameInput.value.trim();
+            
+            if (!name) return alert('Vui lòng nhập tên chủ đề!');
+
+            const saveButton = document.getElementById('topic-mgr-save');
+            const isEditing = editingTopicId !== null;
+            saveButton.disabled = true;
+            saveButton.textContent = isEditing ? 'Đang lưu...' : 'Đang thêm...';
+
+            try {
+                const res = await fetch(isEditing ? `${API_URL}/admin/topics/${editingTopicId}` : `${API_URL}/admin/topics`, {
+                    method: isEditing ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ name, subject_id: subjectId, grade })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    cancelTopicEdit();
+                    await loadManagedTopics();
+                    // update other form dropdowns too
+                    await loadManualFormTopics();
+                    await loadScanFormTopics();
+                    await loadAiFormTopics();
+                } else {
+                    alert('Lỗi: ' + data.msg);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Lỗi kết nối máy chủ.');
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent = editingTopicId === null ? '+ Thêm chủ đề' : '💾 Lưu thay đổi';
+            }
+        }
+
+        async function deleteTopicFromMgr(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa chủ đề này? Các đề thi thuộc chủ đề này sẽ không bị xóa nhưng sẽ mất liên kết chủ đề.')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/admin/topics/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'x-auth-token': localStorage.getItem('token') }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (Number(editingTopicId) === Number(id)) cancelTopicEdit();
+                    await loadManagedTopics();
+                    await loadManualFormTopics();
+                    await loadScanFormTopics();
+                    await loadAiFormTopics();
+                } else {
+                    alert('Lỗi: ' + data.msg);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Lỗi kết nối máy chủ.');
+            }
+        }
+
+        // Dropdown populators for different forms
+        async function loadManualFormTopics() {
+            const subjectId = document.getElementById('man-subject').value;
+            const grade = document.getElementById('man-grade').value;
+            const selectEl = document.getElementById('man-topic');
+            if (!selectEl) return;
+            
+            selectEl.innerHTML = '<option value="">-- Đang tải chủ đề... --</option>';
+            if (!subjectId) return;
+
+            try {
+                const res = await fetch(`${API_URL}/topics?subject_id=${subjectId}&grade=${grade}`);
+                const topics = await res.json();
+                
+                let html = '<option value="">-- Chọn chủ đề (Không bắt buộc) --</option>';
+                if (topics.length > 0) {
+                    html += topics.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+                }
+                selectEl.innerHTML = html;
+            } catch (err) {
+                console.error(err);
+                selectEl.innerHTML = '<option value="">-- Lỗi tải danh sách chủ đề --</option>';
+            }
+        }
+
+        async function loadScanFormTopics() {
+            const subjectId = document.getElementById('scan-subject').value;
+            const grade = document.getElementById('scan-grade').value;
+            const selectEl = document.getElementById('scan-topic');
+            if (!selectEl) return;
+            
+            selectEl.innerHTML = '<option value="">-- Đang tải chủ đề... --</option>';
+            if (!subjectId) return;
+
+            try {
+                const res = await fetch(`${API_URL}/topics?subject_id=${subjectId}&grade=${grade}`);
+                const topics = await res.json();
+                
+                let html = '<option value="">-- Chọn chủ đề (Không bắt buộc) --</option>';
+                if (topics.length > 0) {
+                    html += topics.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+                }
+                selectEl.innerHTML = html;
+            } catch (err) {
+                console.error(err);
+                selectEl.innerHTML = '<option value="">-- Lỗi tải danh sách chủ đề --</option>';
+            }
+        }
+
+        async function loadAiFormTopics() {
+            const subjectId = document.getElementById('ai-subject').value;
+            const grade = document.getElementById('ai-grade').value;
+            const selectEl = document.getElementById('ai-topic');
+            if (!selectEl) return;
+            
+            selectEl.innerHTML = '<option value="">-- Đang tải chủ đề... --</option>';
+            if (!subjectId) return;
+
+            try {
+                const res = await fetch(`${API_URL}/topics?subject_id=${subjectId}&grade=${grade}`);
+                const topics = await res.json();
+                
+                let html = '<option value="">-- Chọn chủ đề (Không bắt buộc) --</option>';
+                if (topics.length > 0) {
+                    html += topics.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+                }
+                selectEl.innerHTML = html;
+            } catch (err) {
+                console.error(err);
+                selectEl.innerHTML = '<option value="">-- Lỗi tải danh sách chủ đề --</option>';
+            }
+        }
+
+        function toggleManualDuration() {
+            const durationGroup = document.getElementById('man-duration-group');
+            if (durationGroup) {
+                durationGroup.style.display = 'block';
+            }
+        }
+
+        function toggleScanDuration() {
+            const durationGroup = document.getElementById('scan-duration-group');
+            if (durationGroup) {
+                durationGroup.style.display = 'block';
             }
         }
 
@@ -1037,7 +1367,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     alert('✨ Quét tài liệu thành công! Hãy xem lại, chỉnh sửa hoặc xem trước đề thi bên dưới.');
-                    loadPreviewIntoEditor(data);
+                    loadPreviewIntoEditor(data, 'scan');
                 } else {
                     const data = await res.json();
                     alert('Lỗi: ' + data.msg);
@@ -1115,8 +1445,11 @@
                 document.getElementById('man-title').value = quiz.title || '';
                 document.getElementById('man-subject').value = quiz.subject_id || '';
                 document.getElementById('man-grade').value = quiz.grade || '12';
+                
+                await loadManualFormTopics();
+                document.getElementById('man-topic').value = quiz.topic_id || '';
                 document.getElementById('man-duration').value = quiz.duration_minutes || 15;
-
+                
                 resetQuestionEditor();
                 questions.forEach(question => addQuestionToEditor(question));
             } catch (err) {
@@ -1149,7 +1482,15 @@
             document.getElementById('man-grade').value = '12';
             document.getElementById('man-duration').value = 15;
             resetQuestionEditor();
-            showSection('manual', element);
+            loadManualFormTopics();
+            toggleManualDuration();
+            if (element) {
+                showSection('manual', element);
+            } else {
+                const manualLi = Array.from(document.querySelectorAll('.sidebar-nav li'))
+                    .find(li => li.textContent.includes('Tạo đề thủ công'));
+                showSection('manual', manualLi);
+            }
         }
 
         function addManualQuestion() {
@@ -1178,6 +1519,8 @@
             const optC = escapeHtml(q ? q.option_c : '');
             const optD = escapeHtml(q ? q.option_d : '');
             const correct = q ? q.correct_option : 'A';
+            const questionType = q && q.question_type === 'fill_blank' ? 'fill_blank' : 'multiple_choice';
+            const correctAnswer = escapeHtml(q ? (q.correct_answer ?? '') : '');
             const explain = escapeHtml(q ? q.explanation : '');
 
             qDiv.innerHTML = `
@@ -1186,14 +1529,21 @@
                     <label style="color: var(--primary); font-size: 1.1rem;" class="q-label">Câu hỏi ${manualQuestionCount}</label>
                     <textarea class="q-content" placeholder="Nhập nội dung câu hỏi..." style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; height: 100px; font-family: inherit; margin-top: 10px;">${content}</textarea>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>Dạng câu hỏi</label>
+                    <select class="q-type" onchange="toggleQuestionTypeFields(this)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-top:5px;">
+                        <option value="multiple_choice" ${questionType === 'multiple_choice' ? 'selected' : ''}>Trắc nghiệm A, B, C, D</option>
+                        <option value="fill_blank" ${questionType === 'fill_blank' ? 'selected' : ''}>Điền số vào ô trống</option>
+                    </select>
+                </div>
+                <div class="q-options-panel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="form-group"><label>Đáp án A</label><input type="text" class="q-a" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optA}"></div>
                     <div class="form-group"><label>Đáp án B</label><input type="text" class="q-b" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optB}"></div>
                     <div class="form-group"><label>Đáp án C</label><input type="text" class="q-c" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optC}"></div>
                     <div class="form-group"><label>Đáp án D</label><input type="text" class="q-d" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;" value="${optD}"></div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px; background: #fff7ed; padding: 15px; border-radius: 12px;">
-                    <div class="form-group">
+                    <div class="form-group q-correct-panel">
                         <label>Đáp án đúng</label>
                         <select class="q-correct" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;">
                             <option value="A" ${correct === 'A' ? 'selected' : ''}>A</option>
@@ -1202,6 +1552,10 @@
                             <option value="D" ${correct === 'D' ? 'selected' : ''}>D</option>
                         </select>
                     </div>
+                    <div class="form-group q-fill-answer-panel" style="display:none;">
+                        <label>Kết quả số chính xác</label>
+                        <input type="text" inputmode="decimal" class="q-correct-answer" placeholder="Ví dụ: 12.5" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-top:5px;" value="${correctAnswer}">
+                    </div>
                     <div class="form-group">
                         <label>Giải thích tại sao đúng (tùy chọn)</label>
                         <input type="text" class="q-explain" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;" placeholder="Giải thích cho học sinh..." value="${explain}">
@@ -1209,6 +1563,36 @@
                 </div>
             `;
             container.appendChild(qDiv);
+            toggleQuestionTypeFields(qDiv.querySelector('.q-type'));
+        }
+
+        function toggleQuestionTypeFields(selectElement) {
+            const block = selectElement.closest('.manual-question-block');
+            if (!block) return;
+            const isFillBlank = selectElement.value === 'fill_blank';
+            block.querySelector('.q-options-panel').style.display = isFillBlank ? 'none' : 'grid';
+            block.querySelector('.q-correct-panel').style.display = isFillBlank ? 'none' : 'block';
+            block.querySelector('.q-fill-answer-panel').style.display = isFillBlank ? 'block' : 'none';
+        }
+
+        function collectQuestionBlock(block) {
+            const questionType = block.querySelector('.q-type').value;
+            return {
+                question_type: questionType,
+                content: block.querySelector('.q-content').value,
+                option_a: questionType === 'fill_blank' ? '' : block.querySelector('.q-a').value,
+                option_b: questionType === 'fill_blank' ? '' : block.querySelector('.q-b').value,
+                option_c: questionType === 'fill_blank' ? '' : block.querySelector('.q-c').value,
+                option_d: questionType === 'fill_blank' ? '' : block.querySelector('.q-d').value,
+                correct_option: questionType === 'fill_blank' ? null : block.querySelector('.q-correct').value,
+                correct_answer: questionType === 'fill_blank' ? block.querySelector('.q-correct-answer').value : null,
+                explanation: block.querySelector('.q-explain').value
+            };
+        }
+
+        function isFiniteNumericAnswer(value) {
+            const normalized = String(value ?? '').trim().replace(',', '.');
+            return normalized !== '' && Number.isFinite(Number(normalized));
         }
 
         function reindexQuestions() {
@@ -1225,23 +1609,18 @@
             const subject_id = document.getElementById('man-subject').value;
             const grade = document.getElementById('man-grade').value;
             const duration = document.getElementById('man-duration').value;
+            const topic_id = document.getElementById('man-topic').value || null;
             
             if (!title) return alert('Vui lòng nhập tiêu đề đề thi!');
 
             const questionBlocks = document.querySelectorAll('.manual-question-block');
-            const questions = Array.from(questionBlocks).map(block => ({
-                content: block.querySelector('.q-content').value,
-                option_a: block.querySelector('.q-a').value,
-                option_b: block.querySelector('.q-b').value,
-                option_c: block.querySelector('.q-c').value,
-                option_d: block.querySelector('.q-d').value,
-                correct_option: block.querySelector('.q-correct').value,
-                explanation: block.querySelector('.q-explain').value
-            }));
+            const questions = Array.from(questionBlocks).map(block => collectQuestionBlock(block));
 
             if (questions.length === 0) return alert('Hãy thêm ít nhất 1 câu hỏi!');
-            if (questions.some(q => !q.content || !q.option_a || !q.option_b || !q.option_c || !q.option_d)) {
-                return alert('Vui lòng điền đầy đủ nội dung câu hỏi và các đáp án!');
+            if (questions.some(q => !q.content || (q.question_type === 'fill_blank'
+                ? !isFiniteNumericAnswer(q.correct_answer)
+                : (!q.option_a || !q.option_b || !q.option_c || !q.option_d)))) {
+                return alert('Câu A-D cần đủ bốn lựa chọn; câu Điền số cần một kết quả số hợp lệ!');
             }
 
             const btn = document.getElementById('btn-save-manual');
@@ -1266,6 +1645,7 @@
                         grade,
                         duration,
                         duration_minutes: duration,
+                        topic_id,
                         questions
                     })
                 });
@@ -1276,8 +1656,9 @@
                     currentEditingQuizId = null;
                     await loadQuizzes();
                     await loadDashboardStats();
+                    
                     showSection('quizzes', Array.from(document.querySelectorAll('.sidebar-nav li'))
-                        .find(li => li.textContent.includes('Quản lý Đề thi')));
+                        .find(li => li.textContent.includes('Quản lý đề thi')));
                 } else {
                     const data = await res.json();
                     alert('❌ Lỗi: ' + data.msg);
@@ -1308,7 +1689,7 @@
                     progress.style.width = '100%';
                     const data = await res.json();
                     alert('🎉 AI đã biên soạn đề thi thành công! Hãy xem lại, chỉnh sửa hoặc xem trước đề thi bên dưới.');
-                    loadPreviewIntoEditor(data);
+                    loadPreviewIntoEditor(data, 'ai');
                 } else {
                     const data = await res.json();
                     alert('❌ Lỗi AI: ' + data.msg);
@@ -1318,11 +1699,16 @@
         }
 
         // Load previewed data into manual quiz builder
-        function loadPreviewIntoEditor(data) {
+        function loadPreviewIntoEditor(data, source = 'scan') {
             currentEditingQuizId = null;
             // Switch to manual section
             const manualLi = Array.from(document.querySelectorAll('.sidebar-nav li')).find(li => li.textContent.includes('Tạo đề thủ công'));
             showSection('manual', manualLi);
+
+            const topicId = source === 'scan'
+                ? document.getElementById('scan-topic').value
+                : document.getElementById('ai-topic').value;
+
             document.getElementById('manual-form-title').textContent = '✍️ Tạo đề thi thủ công';
             document.getElementById('manual-form-description').textContent = 'Kiểm tra và chỉnh sửa nội dung trước khi lưu đề thi.';
             document.getElementById('btn-save-manual').textContent = 'Lưu đề thi ngay';
@@ -1330,6 +1716,11 @@
             document.getElementById('man-title').value = data.title || '';
             document.getElementById('man-subject').value = data.subject_id || '';
             document.getElementById('man-grade').value = data.grade || '12';
+            
+            loadManualFormTopics().then(() => {
+                document.getElementById('man-topic').value = topicId || '';
+            });
+
             document.getElementById('man-duration').value = data.duration || 15;
 
             resetQuestionEditor();
@@ -1529,15 +1920,7 @@
             const duration = document.getElementById('man-duration').value;
             
             const questionBlocks = document.querySelectorAll('.manual-question-block');
-            const questions = Array.from(questionBlocks).map(block => ({
-                content: block.querySelector('.q-content').value,
-                option_a: block.querySelector('.q-a').value,
-                option_b: block.querySelector('.q-b').value,
-                option_c: block.querySelector('.q-c').value,
-                option_d: block.querySelector('.q-d').value,
-                correct_option: block.querySelector('.q-correct').value,
-                explanation: block.querySelector('.q-explain').value
-            }));
+            const questions = Array.from(questionBlocks).map(block => collectQuestionBlock(block));
 
             if (questions.length === 0) return alert('Hãy thêm ít nhất 1 câu hỏi để xem trước!');
 
@@ -1554,7 +1937,10 @@
                     <div style="font-weight: 700; color: #1e293b; margin-bottom: 12px; font-size: 1.05rem;">
                         Câu ${index + 1}: <span class="math-target">${autoWrapMath(q.content || '(Trống)')}</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    ${q.question_type === 'fill_blank' ? `
+                    <div style="padding:16px 18px;border-radius:12px;background:white;border:2px dashed #fdba74;margin-bottom:15px;color:#9a3412;">
+                        🔢 Học sinh sẽ nhập kết quả số vào ô trống.
+                    </div>` : `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
                             <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">A.</span> <span class="math-target">${autoWrapMath(q.option_a || '(Trống)')}</span>
                         </div>
@@ -1567,10 +1953,10 @@
                         <div style="padding: 12px 18px; border-radius: 10px; background: white; border: 1px solid #e2e8f0; font-size: 0.95rem;">
                             <span style="color: var(--primary); font-weight: bold; margin-right: 8px;">D.</span> <span class="math-target">${autoWrapMath(q.option_d || '(Trống)')}</span>
                         </div>
-                    </div>
+                    </div>`}
                     <div style="background: #f0fdf4; border: 1px dashed #bbf7d0; padding: 12px 18px; border-radius: 10px; font-size: 0.95rem; color: #166534; display: flex; align-items: center; gap: 8px;">
                         <span>✅ <b>Đáp án đúng:</b></span>
-                        <span style="font-weight: 800; background: #166534; color: white; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.8rem;">${q.correct_option}</span>
+                        <span style="font-weight: 800; background: #166534; color: white; min-width: 22px; height: 22px; padding:0 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; font-size: 0.8rem;">${q.question_type === 'fill_blank' ? escapeHtml(q.correct_answer) : q.correct_option}</span>
                         ${q.explanation ? `<span style="color: #475569; margin-left: 10px; font-style: italic;">(💡 ${autoWrapMath(q.explanation)})</span>` : ''}
                     </div>
                 `;
