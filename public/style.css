@@ -166,6 +166,19 @@ body {
     border-bottom-color: var(--glass-border) !important;
 }
 
+[data-theme="dark"] .btn-primary,
+[data-theme="dark"] .footer,
+[data-theme="dark"] .footer .logo,
+[data-theme="dark"] .footer p,
+[data-theme="dark"] .nav-streak-badge {
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .footer {
+    background: #0F172A !important;
+    border-top-color: #1E293B !important;
+}
+
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
@@ -182,6 +195,17 @@ body {
 [data-theme="dark"] .subject-card,
 [data-theme="dark"] .quiz-card,
 [data-theme="dark"] .question-card,
+[data-theme="dark"] .topic-card,
+[data-theme="dark"] .topic-body,
+[data-theme="dark"] .topic-page-title,
+[data-theme="dark"] .quiz-list-item,
+[data-theme="dark"] .quiz-item,
+[data-theme="dark"] .exams-info-card,
+[data-theme="dark"] .practice-info,
+[data-theme="dark"] .intro-card,
+[data-theme="dark"] .tree-summary,
+[data-theme="dark"] .tree-map-shell,
+[data-theme="dark"] .empty-message,
 [data-theme="dark"] .result-modal,
 [data-theme="dark"] .roadmap-card,
 [data-theme="dark"] .side-info-card,
@@ -218,7 +242,10 @@ body {
 [data-theme="dark"] .info-tag,
 [data-theme="dark"] .roadmap-history-btn,
 [data-theme="dark"] .suggestion-btn,
-[data-theme="dark"] .option-btn {
+[data-theme="dark"] .option-btn,
+[data-theme="dark"] .topic-header,
+[data-theme="dark"] .btn-back,
+[data-theme="dark"] code {
     background: #111C2F !important;
     color: var(--text-dark) !important;
     border-color: #334155 !important;
@@ -239,7 +266,25 @@ body {
 
 [data-theme="dark"] .roadmap-content,
 [data-theme="dark"] .google-modal-header h3,
-[data-theme="dark"] .google-modal label {
+[data-theme="dark"] .google-modal label,
+[data-theme="dark"] .quiz-info,
+[data-theme="dark"] .quiz-info *,
+[data-theme="dark"] .exams-info-text,
+[data-theme="dark"] .exams-info-text *,
+[data-theme="dark"] .topic-title,
+[data-theme="dark"] .topic-title *,
+[data-theme="dark"] .topic-page-title,
+[data-theme="dark"] .topic-page-title *,
+[data-theme="dark"] .subject-heading,
+[data-theme="dark"] .subject-heading *,
+[data-theme="dark"] .practice-info,
+[data-theme="dark"] .practice-info *,
+[data-theme="dark"] .intro-card,
+[data-theme="dark"] .intro-card *,
+[data-theme="dark"] .tree-summary,
+[data-theme="dark"] .tree-summary *,
+[data-theme="dark"] .skill-node-info,
+[data-theme="dark"] .skill-node-info * {
     color: var(--text-dark) !important;
 }
 
@@ -268,15 +313,68 @@ body {
 }
 
 [data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:white"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: #FFF"],
+[data-theme="dark"] [style*="background:#FFF"],
+[data-theme="dark"] [style*="background: #ffffff"],
+[data-theme="dark"] [style*="background:#ffffff"],
+[data-theme="dark"] [style*="background: #FFFFFF"],
+[data-theme="dark"] [style*="background:#FFFFFF"],
 [data-theme="dark"] [style*="background: #F8FAFC"],
+[data-theme="dark"] [style*="background:#F8FAFC"],
+[data-theme="dark"] [style*="background: #f8fafc"],
+[data-theme="dark"] [style*="background:#f8fafc"],
 [data-theme="dark"] [style*="background: #F1F5F9"],
-[data-theme="dark"] [style*="background: #FFFBF8"] {
-    background: #172033 !important;
+[data-theme="dark"] [style*="background:#F1F5F9"],
+[data-theme="dark"] [style*="background: #f1f5f9"],
+[data-theme="dark"] [style*="background:#f1f5f9"],
+[data-theme="dark"] [style*="background: #FFFBF8"],
+[data-theme="dark"] [style*="background:#FFFBF8"],
+[data-theme="dark"] [style*="background: #fffbf8"],
+[data-theme="dark"] [style*="background:#fffbf8"],
+[data-theme="dark"] [style*="background: #fff7ed"],
+[data-theme="dark"] [style*="background:#fff7ed"],
+[data-theme="dark"] [style*="background: #FFFAF5"],
+[data-theme="dark"] [style*="background:#FFFAF5"],
+[data-theme="dark"] [style*="background: #fffaf5"],
+[data-theme="dark"] [style*="background:#fffaf5"],
+[data-theme="dark"] [style*="background-color: white"],
+[data-theme="dark"] [style*="background-color:white"],
+[data-theme="dark"] [style*="background-color: #fff"],
+[data-theme="dark"] [style*="background-color:#fff"],
+[data-theme="dark"] [style*="background-color: #ffffff"],
+[data-theme="dark"] [style*="background-color:#ffffff"],
+[data-theme="dark"] [style*="background-color: #F8FAFC"],
+[data-theme="dark"] [style*="background-color:#F8FAFC"],
+[data-theme="dark"] [style*="background-color: #f8fafc"],
+[data-theme="dark"] [style*="background-color:#f8fafc"],
+[data-theme="dark"] [style*="background-color: #F1F5F9"],
+[data-theme="dark"] [style*="background-color:#F1F5F9"],
+[data-theme="dark"] [style*="background-color: #f1f5f9"],
+[data-theme="dark"] [style*="background-color:#f1f5f9"] {
+    background: #0F172A !important;
+    background-color: #0F172A !important;
+    border-color: #334155 !important;
 }
 
 [data-theme="dark"] [style*="color: #334155"],
+[data-theme="dark"] [style*="color:#334155"],
 [data-theme="dark"] [style*="color: #1E293B"],
-[data-theme="dark"] [style*="color: #0F172A"] {
+[data-theme="dark"] [style*="color:#1E293B"],
+[data-theme="dark"] [style*="color: #1e293b"],
+[data-theme="dark"] [style*="color:#1e293b"],
+[data-theme="dark"] [style*="color: #0F172A"],
+[data-theme="dark"] [style*="color:#0F172A"],
+[data-theme="dark"] [style*="color: #0f172a"],
+[data-theme="dark"] [style*="color:#0f172a"],
+[data-theme="dark"] [style*="color: #475569"],
+[data-theme="dark"] [style*="color:#475569"],
+[data-theme="dark"] [style*="color: #64748B"],
+[data-theme="dark"] [style*="color:#64748B"],
+[data-theme="dark"] [style*="color: #64748b"],
+[data-theme="dark"] [style*="color:#64748b"] {
     color: var(--text-dark) !important;
 }
 
@@ -338,6 +436,7 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    gap: 18px;
 }
 
 .logo {
@@ -345,6 +444,8 @@ body {
     font-weight: 700;
     color: var(--text-dark);
     text-decoration: none;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .logo span {
@@ -355,14 +456,32 @@ body {
     display: flex;
     list-style: none;
     align-items: center;
-    gap: 30px;
+    justify-content: flex-end;
+    gap: clamp(8px, 1.15vw, 18px);
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+}
+
+.nav-links li {
+    flex: 0 0 auto;
 }
 
 .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     text-decoration: none;
     color: var(--text-dark);
     font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
     transition: var(--transition);
+}
+
+.nav-links .btn {
+    min-height: 40px;
+    padding: 8px 16px;
 }
 
 .nav-links a:hover {
@@ -763,7 +882,7 @@ body {
 
 /* Ranking Section */
 .ranking {
-    padding: 120px 0;
+    padding: 88px 0 18px;
     background: var(--bg-orange);
     position: relative;
 }
@@ -773,7 +892,7 @@ body {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: linear-gradient(180deg, var(--bg-orange) 0%, var(--white) 100%);
+    background: linear-gradient(180deg, var(--bg-orange) 0%, var(--bg-light) 82%, #0F172A 100%);
     z-index: 0;
 }
 
@@ -869,22 +988,51 @@ body {
 
 .nav-links a[href*="index.html#subjects"],
 .nav-links a[href="#subjects"],
+.nav-links a[href*="exams.html"],
 .nav-links a[href*="practice.html"],
+.nav-links a[href*="skill-tree.html"],
 .nav-links a[href*="roadmap.html"],
 .nav-links a[href*="leaderboard.html"] {
     border: 1.5px solid rgba(255, 138, 0, 0.35);
     border-radius: 12px;
-    padding: 8px 12px;
+    min-height: 40px;
+    padding: 8px 10px;
     background: rgba(255, 255, 255, 0.68);
 }
 
 .nav-links a[href*="index.html#subjects"]:hover,
 .nav-links a[href="#subjects"]:hover,
+.nav-links a[href*="exams.html"]:hover,
 .nav-links a[href*="practice.html"]:hover,
+.nav-links a[href*="skill-tree.html"]:hover,
 .nav-links a[href*="roadmap.html"]:hover,
 .nav-links a[href*="leaderboard.html"]:hover {
     border-color: var(--primary);
     background: var(--primary-ultra-soft);
+}
+
+[data-theme="dark"] .nav-links a[href*="index.html#subjects"],
+[data-theme="dark"] .nav-links a[href="#subjects"],
+[data-theme="dark"] .nav-links a[href*="exams.html"],
+[data-theme="dark"] .nav-links a[href*="practice.html"],
+[data-theme="dark"] .nav-links a[href*="skill-tree.html"],
+[data-theme="dark"] .nav-links a[href*="roadmap.html"],
+[data-theme="dark"] .nav-links a[href*="leaderboard.html"] {
+    background: #111C2F;
+    border-color: #334155;
+    color: #E2E8F0;
+}
+
+[data-theme="dark"] .nav-links a[href*="index.html#subjects"]:hover,
+[data-theme="dark"] .nav-links a[href="#subjects"]:hover,
+[data-theme="dark"] .nav-links a[href*="exams.html"]:hover,
+[data-theme="dark"] .nav-links a[href*="practice.html"]:hover,
+[data-theme="dark"] .nav-links a[href*="skill-tree.html"]:hover,
+[data-theme="dark"] .nav-links a[href*="roadmap.html"]:hover,
+[data-theme="dark"] .nav-links a[href*="leaderboard.html"]:hover {
+    background: rgba(255, 138, 0, 0.16);
+    border-color: var(--primary);
+    color: var(--primary-light);
 }
 
 .subject-card,
@@ -916,36 +1064,33 @@ body {
 
 /* Footer */
 .footer {
-    padding: 80px 0;
+    padding: 12px 0 10px;
     text-align: center;
-    background: var(--secondary);
-    color: var(--white);
+    background: #0F172A;
+    color: #FFFFFF;
     position: relative;
     overflow: hidden;
+    border-top: 1px solid #1E293B;
 }
 
 .footer::before {
-    content: '';
-    position: absolute;
-    top: -50px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120%;
-    height: 100px;
-    background: var(--bg-light);
-    border-radius: 50%;
+    display: none;
 }
 
 .footer p {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.72);
     position: relative;
     z-index: 1;
+    font-size: 13px;
+    line-height: 1.35;
 }
 
 .footer .logo {
-    color: var(--white);
-    margin-bottom: 20px;
+    color: #FFFFFF;
+    margin-bottom: 2px;
     display: inline-block;
+    font-size: 20px;
+    line-height: 1.2;
 }
 
 /* Quiz Interface Styles */
@@ -1722,9 +1867,12 @@ body {
         justify-content: flex-start;
     }
 
-    .subjects,
-    .ranking {
+    .subjects {
         padding: 72px 0;
+    }
+
+    .ranking {
+        padding: 56px 0 12px;
     }
 
     .section-header {

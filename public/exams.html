@@ -35,7 +35,7 @@
             top: -100px; right: -100px;
             border-radius: 50%;
         }
-        .exams-container { padding-bottom: 100px; }
+        .exams-container { padding-bottom: 36px; }
         .exams-info-card {
             background: white;
             border-radius: var(--radius-lg);
@@ -310,11 +310,19 @@
             showSubjectsView();
         }
 
-        function showSubjectsView() {
+        function isSubjectGridLoaded() {
+            return document.querySelectorAll('#subject-grid .subject-card').length > 0;
+        }
+
+        async function showSubjectsView() {
             const mainView = document.getElementById('exams-main-view');
             mainView.style.display = 'block';
             mainView.classList.add('active');
             document.getElementById('topics-view').style.display = 'none';
+            history.pushState({}, '', `exams.html?grade=${currentGrade}`);
+            if (!isSubjectGridLoaded()) {
+                await fetchSubjects();
+            }
         }
 
         function toggleTopicBody(headerEl) {
@@ -422,7 +430,7 @@
                                     <span class="exam-badge">⏳ Đếm ngược thời gian</span>
                                 </div>
                             </div>
-                            <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                            <a href="quiz.html?id=${q.id}&mode=exam&subject=${q.subject_id || subjectId}&grade=${q.grade || currentGrade}&source=exams" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
                         </div>
                     `).join('');
                     const generalCard = document.createElement('div');
@@ -464,7 +472,7 @@
                                         <span class="exam-badge">⏳ Đếm ngược thời gian</span>
                                     </div>
                                 </div>
-                                <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                                <a href="quiz.html?id=${q.id}&mode=exam&subject=${q.subject_id || subjectId}&grade=${q.grade || currentGrade}&source=exams" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
                             </div>
                         `).join('');
                     }
@@ -500,7 +508,7 @@
                                     <span class="exam-badge">⏳ Đếm ngược thời gian</span>
                                 </div>
                             </div>
-                            <a href="quiz.html?id=${q.id}&mode=exam" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
+                            <a href="quiz.html?id=${q.id}&mode=exam&subject=${q.subject_id || subjectId}&grade=${q.grade || currentGrade}&source=exams" class="btn btn-primary" style="padding: 10px 24px; border-radius: 12px; font-size: 0.9rem; white-space: nowrap;">Vào thi →</a>
                         </div>
                     `).join('');
                     generalCard.innerHTML = `
@@ -565,3 +573,4 @@
     <script type="module" src="main.js"></script>
 </body>
 </html>
+

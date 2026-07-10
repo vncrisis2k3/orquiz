@@ -728,10 +728,20 @@ app.post('/api/results', auth, async (req, res) => {
             [user_id, quiz_id, score, correct_count, total_count, time_spent]
         );
 
-        const pointsEarned = correct_count * 10;
         await db.query(
-            'UPDATE users SET total_points = total_points + $1 WHERE id = $2',
-            [pointsEarned, user_id]
+            `UPDATE users
+             SET total_points = totals.total_points,
+                 level = GREATEST(1, FLOOR(totals.total_points::numeric / 500)::int + 1)
+             FROM (
+                 SELECT
+                     user_id,
+                     LEAST(COALESCE(SUM(GREATEST(correct_answers_count, 0)::numeric * 10), 0), 2147483647)::int AS total_points
+                 FROM results
+                 WHERE user_id = $1
+                 GROUP BY user_id
+             ) totals
+             WHERE users.id = totals.user_id`,
+            [user_id]
         );
 
         // Update daily streak
@@ -1406,7 +1416,35 @@ app.delete('/api/admin/quiz/:id', [auth, adminAuth], async (req, res) => {
 // 12. Get Leaderboard
 app.get('/api/leaderboard', async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM leaderboard LIMIT 10');
+        const result = await db.query(`
+            WITH user_scores AS (
+                SELECT
+                    u.id,
+                    u.username,
+                    u.full_name,
+                    COALESCE(SUM(GREATEST(r.correct_answers_count, 0)::numeric * 10), 0) AS total_points,
+                    COUNT(r.id)::int AS attempts
+                FROM users u
+                LEFT JOIN results r ON r.user_id = u.id
+                GROUP BY u.id, u.username, u.full_name
+            ),
+            ranked AS (
+                SELECT
+                    id,
+                    username,
+                    full_name,
+                    LEAST(total_points, 2147483647)::int AS total_points,
+                    LEAST(GREATEST(1, FLOOR(total_points / 500) + 1), 2147483647)::int AS level,
+                    attempts,
+                    RANK() OVER (ORDER BY total_points DESC, attempts ASC, id ASC) AS rank_position
+                FROM user_scores
+                WHERE total_points > 0
+            )
+            SELECT id, username, full_name, total_points, level, rank_position
+            FROM ranked
+            ORDER BY rank_position ASC, total_points DESC
+            LIMIT 10
+        `);
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);

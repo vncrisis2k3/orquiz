@@ -85,9 +85,25 @@ CREATE TABLE IF NOT EXISTS system_settings (
 -- Index and View
 CREATE INDEX IF NOT EXISTS idx_user_total_points ON users(total_points DESC);
 CREATE OR REPLACE VIEW leaderboard AS
-SELECT id, username, full_name, total_points, level,
-RANK() OVER (ORDER BY total_points DESC) as rank_position
-FROM users;
+WITH user_scores AS (
+    SELECT
+        u.id,
+        u.username,
+        u.full_name,
+        COALESCE(SUM(GREATEST(r.correct_answers_count, 0)::numeric * 10), 0) AS total_points
+    FROM users u
+    LEFT JOIN results r ON r.user_id = u.id
+    GROUP BY u.id, u.username, u.full_name
+)
+SELECT
+    id,
+    username,
+    full_name,
+    LEAST(total_points, 2147483647)::int AS total_points,
+    LEAST(GREATEST(1, FLOOR(total_points / 500) + 1), 2147483647)::int AS level,
+    RANK() OVER (ORDER BY total_points DESC, id ASC) as rank_position
+FROM user_scores
+WHERE total_points > 0;
 `;
 
 const seedData = `

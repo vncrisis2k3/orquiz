@@ -19,6 +19,10 @@ let pageExitWarnings = 0;
 let lastExitWarningAt = 0;
 const MAX_PAGE_EXIT_WARNINGS = 3;
 
+function isExamMode() {
+    return currentMode === 'exam';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('token')) {
         window.location.href = 'auth.html';
@@ -39,6 +43,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!canOpen) return;
             const anotherButton = document.getElementById('another-quiz-btn');
             if (anotherButton) anotherButton.textContent = 'Về bản đồ học tập';
+        }
+        if (currentMode === 'exam' && currentSource === 'exams') {
+            const anotherButton = document.getElementById('another-quiz-btn');
+            if (anotherButton) anotherButton.textContent = 'Quay lại danh sách môn';
         }
         await loadQuiz(quizId);
     } else if (subjectId) {
@@ -136,6 +144,8 @@ async function loadQuiz(id) {
         const response = await fetch(`${API_URL}/quiz/${id}`);
         if (!response.ok) throw new Error('Không thể tải bài học.');
         currentQuiz = await response.json();
+        currentSubjectId = currentSubjectId || currentQuiz.subject_id;
+        currentGrade = currentGrade || currentQuiz.grade;
         questions = Array.isArray(currentQuiz.questions) ? currentQuiz.questions : [];
         answeredQuestions = new Set();
         skillCorrectCount = 0;
@@ -424,6 +434,7 @@ function playAnswerSound(isCorrect) {
 }
 
 function showInstantAiFeedback(isCorrect, correctOption, customMessage = '') {
+    if (isExamMode()) return;
     const feedback = document.getElementById('instant-ai-feedback');
     const title = document.getElementById('instant-ai-title');
     const message = document.getElementById('instant-ai-message');
@@ -623,6 +634,12 @@ async function loadRandomQuiz(subjectId, excludeId = null, grade = null) {
 }
 
 async function loadAnotherQuiz() {
+    if (currentMode === 'exam' && currentSource === 'exams') {
+        const query = currentGrade ? `?grade=${currentGrade}` : '';
+        window.location.href = `exams.html${query}`;
+        return;
+    }
+
     if (currentMode === 'practice') {
         const query = currentSubjectId
             ? `?subject=${currentSubjectId}${currentGrade ? `&grade=${currentGrade}` : ''}`

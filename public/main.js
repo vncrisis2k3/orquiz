@@ -5,6 +5,11 @@ const chatbotOnlyMode = Boolean(
 );
 let currentGrade = 12; // Default to Grade 12
 
+function shouldHideFloatingChatbot() {
+    const page = window.location.pathname.split('/').pop();
+    return page === 'quiz.html';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     initFloatingChatbot();
     if (chatbotOnlyMode) return;
@@ -286,6 +291,12 @@ function getSubjectIcon(slug) {
 let chatHistory = [];
 
 function initFloatingChatbot() {
+    if (shouldHideFloatingChatbot()) {
+        document.getElementById('floating-chat-container')?.remove();
+        document.body.classList.remove('mobile-chat-open');
+        return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) return;
 
