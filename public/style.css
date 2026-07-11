@@ -993,11 +993,16 @@ body {
 .nav-links a[href*="skill-tree.html"],
 .nav-links a[href*="roadmap.html"],
 .nav-links a[href*="leaderboard.html"] {
-    border: 1.5px solid rgba(255, 138, 0, 0.35);
+    border: 1.5px solid #E2E8F0;
     border-radius: 12px;
     min-height: 40px;
     padding: 8px 10px;
     background: rgba(255, 255, 255, 0.68);
+}
+
+.nav-links .btn-outline {
+    border-color: #E2E8F0;
+    color: var(--text-dark);
 }
 
 .nav-links a[href*="index.html#subjects"]:hover,
@@ -1165,6 +1170,7 @@ body {
     font-weight: 600;
     margin-bottom: 15px;
     display: block;
+    text-align: center;
 }
 
 .question-text {
@@ -1172,6 +1178,7 @@ body {
     font-weight: 700;
     margin-bottom: 30px;
     line-height: 1.4;
+    text-align: center;
 }
 
 .options-grid {
